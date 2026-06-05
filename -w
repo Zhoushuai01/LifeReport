@@ -1,0 +1,105 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/pages-json-js");
+import {uni,upx2px,getCurrentPages,getApp,UniServiceJSBridge,UniViewJSBridge} from "/node_modules/@dcloudio/uni-h5/dist/uni-h5.es.js"
+window.getApp = getApp
+window.getCurrentPages = getCurrentPages
+window.wx = uni
+window.uni = uni
+window.UniViewJSBridge = UniViewJSBridge
+window.UniServiceJSBridge = UniServiceJSBridge
+window.rpx2px = upx2px
+window.__setupPage = (com)=>setupPage(com)
+
+import { defineAsyncComponent, resolveComponent, createVNode, withCtx, openBlock, createBlock } from "/node_modules/@dcloudio/uni-h5-vue/dist/vue.runtime.esm.js"
+import { PageComponent, useI18n, setupWindow, setupPage } from "/node_modules/@dcloudio/uni-h5/dist/uni-h5.es.js"
+import { appId, appName, appVersion, appVersionCode, debug, networkTimeout, router, async, sdkConfigs, qqMapKey, googleMapKey, aMapKey, bMapKey, aMapSecurityJsCode, aMapServiceHost, nvue, locale, fallbackLocale, darkmode, themeConfig } from "/src/manifest-json-js"
+const locales = /* #__PURE__ */ Object.assign({})
+
+const extend = Object.assign
+import "/node_modules/@dcloudio/uni-h5/style/framework/base.css"
+import "/node_modules/@dcloudio/uni-h5/style/framework/async.css"
+import "/node_modules/@dcloudio/uni-h5/style/framework/pageHead.css"
+import "/node_modules/@dcloudio/uni-h5/style/framework/nvue.css"
+import "/node_modules/@dcloudio/uni-components/style/input.css"
+import "/node_modules/@dcloudio/uni-h5/style/api/modal.css"
+import "/node_modules/@dcloudio/uni-h5/style/api/toast.css"
+import "/node_modules/@dcloudio/uni-h5/style/api/action-sheet.css"
+import "/node_modules/@dcloudio/uni-components/style/resize-sensor.css"
+import "/node_modules/@dcloudio/uni-components/style/swiper.css"
+import "/node_modules/@dcloudio/uni-components/style/swiper-item.css"
+import "/node_modules/@dcloudio/uni-components/style/movable-area.css"
+import "/node_modules/@dcloudio/uni-components/style/movable-view.css"
+import "/node_modules/@dcloudio/uni-h5/style/api/location-view.css"
+import "/node_modules/@dcloudio/uni-h5/style/api/location-picker.css"
+import "/node_modules/@dcloudio/uni-components/style/input.css"
+import "/node_modules/@dcloudio/uni-h5/style/map.css"
+import "/node_modules/@dcloudio/uni-components/style/scroll-view.css"
+
+  window.__uniConfig=extend({"globalStyle":{"backgroundColor":"#F8F8F8","navigationBar":{"backgroundColor":"#F8F8F8","titleText":"人生报告","type":"default","titleColor":"#000000"},"isNVue":false},"compilerVersion":"5.07"},{
+  appId,
+  appName,
+  appVersion,
+  appVersionCode,
+  async,
+  debug,
+  networkTimeout,
+  sdkConfigs,
+  qqMapKey,
+  bMapKey,
+  googleMapKey,
+  aMapKey,
+  aMapSecurityJsCode,
+  aMapServiceHost,
+  nvue,
+  locale,
+  fallbackLocale,
+  locales:Object.keys(locales).reduce((res,name)=>{const locale=name.replace(/\.\/locale\/(uni-app.)?(.*).json/,'$2');extend(res[locale]||(res[locale]={}),locales[name].default);return res},{}),
+  router,
+  darkmode,
+  themeConfig,
+})
+
+
+window.__uniLayout = window.__uniLayout || {}
+
+const AsyncComponentOptions = {
+      delay: async.delay,
+      timeout: async.timeout,
+      suspensible: async.suspensible
+    }
+    if(async.loading){
+      AsyncComponentOptions.loadingComponent = {
+        name:'SystemAsyncLoading',
+        render(){
+          return createVNode(resolveComponent(async.loading))
+        }
+      }
+    }
+    if(async.error){
+      AsyncComponentOptions.errorComponent = {
+        name:'SystemAsyncError',
+        props:['error'],
+        render(){
+          return createVNode(resolveComponent(async.error), { error: this.error })
+        }
+      }
+    }
+  const PagesLifeReportIndexLoader = ()=>import("/src/pages/life-report/index.vue").then(com => setupPage(com.default || com, 'pages/life-report/index.vue'))
+const PagesLifeReportIndex = defineAsyncComponent(extend({loader:PagesLifeReportIndexLoader},AsyncComponentOptions))
+
+function renderPage(component,props){
+  return (openBlock(), createBlock(PageComponent, null, {page: withCtx(() => [createVNode(component, extend({},props,{ref: "page"}), null, 512 /* NEED_PATCH */)]), _: 1 /* STABLE */}))
+}
+window.__uniRoutes=[{
+  path:'/',
+  alias:'/pages/life-report/index',
+  component:{setup(){ const app = getApp(); const query = app && app.$route && app.$route.query || {}; return ()=>renderPage(PagesLifeReportIndex,query)}},
+  loader: PagesLifeReportIndexLoader,
+  meta: {"isQuit":true,"isEntry":true,"navigationBar":{"titleText":"人生报告","type":"default"},"isNVue":false}
+}].map(uniRoute=>(uniRoute.meta.route = (uniRoute.alias || uniRoute.path).slice(1),uniRoute))
+
+if(import.meta.hot){
+  import.meta.hot.on('invalidate', (data) => {
+      import.meta.hot.invalidate()
+  })
+}
+export {}

@@ -1,15 +1,27 @@
 {
-	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+	"pages": [
 		{
-			"path": "pages/index/index",
+			"path": "pages/feature/index",
 			"style": {
-				"navigationBarTitleText": "uni-app"
+				"navigationBarTitleText": "人生报告"
+			}
+		},
+		{
+			"path": "pages/life-report/index",
+			"style": {
+				"navigationBarTitleText": "人生报告"
+			}
+		},
+		{
+			"path": "pages/life-report/result",
+			"style": {
+				"navigationBarTitleText": "人生报告"
 			}
 		}
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "uni-app",
+		"navigationBarTitleText": "人生报告",
 		"navigationBarBackgroundColor": "#F8F8F8",
 		"backgroundColor": "#F8F8F8"
 	}
