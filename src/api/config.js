@@ -26,7 +26,7 @@ export const ENV_LIST = {
   },
   product: {
     label: "生产环境",
-    baseURL: "https://api.example.com/yyfs-api",
+    baseURL: "https://azoc.ai:8888/yyfs-api",
     type: "product"
   }
 };

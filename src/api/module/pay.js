@@ -3,6 +3,7 @@
  * /open/biz/report/price         GET  查询价格
  * /open/biz/report/pay/create    POST 创建支付订单
  * /open/biz/report/pay/status    GET  查询支付状态
+ * /open/biz/report/generate      POST 生成报告
  */
 import { get, post } from "../request.js";
 
@@ -38,4 +39,18 @@ export function createPayOrder(data) {
  */
 export function getPayStatus(params) {
   return get("/open/biz/report/pay/status", params);
+}
+
+/**
+ * 生成报告
+ * @param {Object} data
+ * @param {string} data.orderNo     系统订单号（必需）
+ * @param {string} [data.solarDate] 出生日期（公历） optional
+ * @param {string} [data.birthTime] 出生时间 optional
+ * @param {string} [data.gender]    性别 optional
+ * @param {string} [data.city]      出生地省份/城市 optional
+ * @returns {Promise<{code,msg,data:{orderNo:string,genData:string,genStatus:number,info?:string}}>}
+ */
+export function generateReport(data) {
+  return post("/open/biz/report/generate", data);
 }

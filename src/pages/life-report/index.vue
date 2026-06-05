@@ -316,28 +316,55 @@ const openExternalUrl = (url) => {
 };
 
 /**
- * 直接触发支付宝 form 表单（不做任何解析）
- * 后端 payUrl 是 <form action="..."><scr\ipt>document.forms[0].submit()<\/scr\ipt>
- * 用隐藏 iframe document.write 写入，浏览器执行内部 submit 脚本跳到支付宝收银台
+ * 触发支付宝 form 表单跳转
+ * 后端 payUrl 是完整 HTML：
+ *   <form action="https://open.alipay.com/..." method="post">
+ *     <input name="..." value="...">
+ *     <scr\ipt>document.forms[0].submit()<\/scr\ipt>
+ *   </form>
+ *
+ * 策略：
+ * 1. 优先用 window.open 打开新窗口，把 HTML 写进去 — form 内的脚本自动 submit 跳到支付宝
+ * 2. 弹窗被拦截时解析 form，提取 action + 隐藏域，在当前窗口内建一个 form 直接 POST 提交
  */
 const triggerAlipayForm = (html) => {
   if (!html || typeof html !== "string") return false;
+
   // #ifdef H5
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
-  iframe.setAttribute("aria-hidden", "true");
-  document.body.appendChild(iframe);
-  const doc = iframe.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
+  // ---------- 策略 1：新窗口写入 HTML ----------
+//   const w = window.open("", "_blank", "noopener");
+//   if (w) {
+//     w.document.write(html);
+//     w.document.close();
+//     return w; // 返回窗口引用，用于支付成功后关闭
+//   }
+
+  // ---------- 策略 2：弹窗被拦截，在主页 document 中构造 form POST ----------
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(html, "text/html");
+  const originalForm = parsed.querySelector("form");
+  if (!originalForm) return false;
+
+  const form = document.createElement("form");
+  form.method = originalForm.getAttribute("method") || "post";
+  form.action = originalForm.getAttribute("action") || "";
+  form.acceptCharset = originalForm.getAttribute("accept-charset") || "utf-8";
+  form.style.display = "none";
+
+  const inputs = originalForm.querySelectorAll("input");
+  for (const inp of inputs) {
+    const el = document.createElement("input");
+    el.type = "hidden";
+    el.name = inp.getAttribute("name") || "";
+    el.value = inp.getAttribute("value") || "";
+    form.appendChild(el);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
   return true;
   // #endif
+
   // #ifndef H5
   return false;
   // #endif
@@ -397,12 +424,34 @@ const onConfirmPay = async () => {
 
   loading.value = true;
   try {
+    // 构造支付成功后的回跳地址（H5 端，带上用户信息让结果页展示）
+    // #ifdef H5
+    const params = new URLSearchParams({
+      name: form.name,
+      solar_date: form.solar_date,
+      birth_time: form.birth_time,
+      gender: form.gender,
+      birth_place: form.birth_place
+    });
+    const returnUrl = window.location.href.replace(/\/index$/, "/result") + "?" + params.toString();
+    // #endif
+    // 检测是否为手机端，决定使用 H5 还是 PC 支付
+    // #ifdef H5
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const tradeType = isMobile ? "H5" : "PC";
+    // #endif
+    // #ifndef H5
+    const tradeType = "H5";
+    // #endif
     const createRes = await createPayOrder({
       payChannel: "ALIPAY",
-      tradeType: "H5",
+      tradeType: tradeType,
       productId: PRODUCT_ID,
       code: captchaCode.value,
-      uuid: captchaUuid.value
+      uuid: captchaUuid.value,
+      // #ifdef H5
+      returnUrl
+      // #endif
     });
     if (createRes?.code !== 200) {
       uni.showToast({ title: createRes?.msg || "创建订单失败", icon: "none" });
@@ -412,6 +461,13 @@ const onConfirmPay = async () => {
 
     currentOrderNo = createRes.data?.orderNo || "";
     const payUrlRaw = createRes.data?.payUrl;
+
+    // 保存订单号到 localStorage，供 result.vue 回跳后读取
+    if (currentOrderNo) {
+      try {
+        localStorage.setItem("report_order_no", currentOrderNo);
+      } catch (_) { /* ignore */ }
+    }
     
 
     if (!currentOrderNo) {
@@ -422,10 +478,13 @@ const onConfirmPay = async () => {
     captchaVisible.value = false;
 
     if (payUrlRaw) {
-      // 直接触发支付宝 form 表单跳转（不做任何解析）
-      // form 内置 <scr\ipt>document.forms[0].submit()<\/scr\ipt>，写入 iframe 后会自动跳
-      const triggered = triggerAlipayForm(payUrlRaw);
-      if (triggered) {
+      // 触发支付宝 form 表单跳转（新窗口 / 当前页 POST 两种策略）
+      const result = triggerAlipayForm(payUrlRaw);
+      if (result) {
+        // 如果返回的是 window 引用，保存下来以便支付成功后关闭
+        if (result !== true && typeof result.close === "function") {
+          payWindow = result;
+        }
         uni.showToast({
           title: "请在新窗口完成支付",
           icon: "none",
