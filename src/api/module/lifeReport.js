@@ -5,6 +5,15 @@
 import { post } from "../request.js";
 
 /**
+ * 获取地区列表（国家+省份）
+ * POST /system/paipan/regions
+ * @returns {Promise<{code,msg,data:Record<string,{type:string,default_timezone:string,locations:Record<string,{longitude:number,latitude:number}>}}>}>}
+ */
+export function getRegions() {
+  return post("/system/paipan/regions");
+}
+
+/**
  * 生成报告
  * @param {Object} data
  * @param {string} data.orderNo     系统订单号（必需）

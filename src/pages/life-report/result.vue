@@ -1,4 +1,4 @@
-﻿﻿<script setup>
+﻿﻿﻿<script setup>
 import { ref, computed, reactive } from "vue";
 import { onLoad, onPageScroll } from "@dcloudio/uni-app";
 import { generateReport } from "@/api/module/pay.js";
@@ -557,44 +557,83 @@ const rhythmDetail = computed(() => {
 
 const disclaimerText = computed(() => reportData.value.disclaimer || "内容仅作为传统文化娱乐参考，不构成医疗、法律、金融、投资、婚恋或人生重大决策建议。");
 
-// 下载报告
+// 下载报告 — 整页生成 PDF
 const downloadReport = async () => {
   if (isDownloading.value) return;
   try {
     isDownloading.value = true;
-    uni.showLoading({ title: "正在生成报告..." });
-    // 构建完整报告数据
-    const reportJson = JSON.stringify(genData.value, null, 2);
-    const fileName = `人生报告_${reportData.value.targetYear || new Date().getFullYear()}.json`;
+    uni.showLoading({ title: "正在生成PDF..." });
+
     // #ifdef H5
-    const blob = new Blob([reportJson], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    link.click();
-    URL.revokeObjectURL(url);
-    // #endif
-    // #ifndef H5
-    const savedFilePath = `${uni.env.USER_DATA_PATH}/${fileName}`;
-    const fs = uni.getFileSystemManager();
-    fs.writeFile({
-      filePath: savedFilePath,
-      data: reportJson,
-      encoding: "utf8",
-      success: () => {
-        uni.hideLoading();
-        uni.showToast({ title: "报告已保存", icon: "none" });
-      },
-      fail: () => {
-        uni.hideLoading();
-        uni.showToast({ title: "下载失败", icon: "none" });
-      }
+    const { default: html2canvas } = await import("html2canvas");
+    const { default: jsPDF } = await import("jspdf");
+
+    const pageEl = document.querySelector(".life-result-page .page-body");
+    if (!pageEl) {
+      uni.showToast({ title: "页面未就绪", icon: "none" });
+      return;
+    }
+
+    // 滚动到顶部确保完整截图
+    window.scrollTo(0, 0);
+    await new Promise((r) => setTimeout(r, 300));
+
+    const canvas = await html2canvas(pageEl, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: "#f7f7f3",
+      logging: false
     });
+
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+
+    // A4 尺寸 (mm)
+    const a4Width = 210;
+    const a4Height = 297;
+    const margin = 10;
+    const contentWidth = a4Width - margin * 2;
+    const contentHeight = (contentWidth / imgWidth) * imgHeight;
+
+    const pdf = new jsPDF("p", "mm", "a4");
+    let position = margin;
+    let remainingHeight = contentHeight;
+    const pageContentHeight = a4Height - margin * 2;
+
+    while (remainingHeight > 0) {
+      if (position > margin) {
+        pdf.addPage();
+        position = margin;
+      }
+      const srcY = ((position - margin) / contentHeight) * imgHeight;
+      const srcH = Math.min(
+        (pageContentHeight / contentHeight) * imgHeight,
+        imgHeight - srcY
+      );
+
+      pdf.addImage(imgData, "JPEG", margin, position, contentWidth, (srcH / imgWidth) * contentWidth, undefined, "FAST", 0);
+
+      position += (srcH / imgWidth) * contentWidth;
+      remainingHeight -= (srcH / imgWidth) * contentWidth;
+    }
+
+    const fileName = `人生报告_${reportData.value.targetYear || new Date().getFullYear()}.pdf`;
+    pdf.save(fileName);
+
+    uni.hideLoading();
+    uni.showToast({ title: "PDF已下载", icon: "none" });
+    // #endif
+
+    // #ifndef H5
+    // 非 H5 端：提示当前环境暂不支持 PDF 下载
+    uni.hideLoading();
+    uni.showToast({ title: "请在H5端下载PDF", icon: "none" });
     // #endif
   } catch (e) {
     uni.hideLoading();
-    uni.showToast({ title: "下载失败", icon: "none" });
+    uni.showToast({ title: "生成失败，请重试", icon: "none" });
     console.error("[downloadReport] error", e);
   } finally {
     isDownloading.value = false;
@@ -2576,5 +2615,29 @@ onPageScroll((e) => {
   color: #fff;
   border-radius: 12rpx;
   font-size: 28rpx;
+}
+
+/* 打印 / PDF 导出样式 */
+@media print {
+  .download-btn,
+  .back-top,
+  .page-header-actions {
+    display: none !important;
+  }
+
+  .life-result-page {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: #fff !important;
+  }
+
+  .top-bg {
+    display: none !important;
+  }
+
+  .page-body {
+    margin: 0 auto !important;
+    padding: 20px !important;
+  }
 }
 </style>

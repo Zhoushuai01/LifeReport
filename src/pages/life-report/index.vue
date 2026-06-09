@@ -92,13 +92,20 @@
 
           <view class="form-group">
             <text class="label">出生地</text>
-            <input
-              class="input"
-              v-model="form.birth_place"
-              type="text"
-              placeholder="请输入出生地点，例如：中国大陆 广东省"
-              placeholder-class="input-placeholder"
-            />
+            <picker
+              mode="multiSelector"
+              :range="pickerRange"
+              :value="pickerValue"
+              @change="onRegionChange"
+              @columnchange="onRegionColumnChange"
+            >
+              <view class="picker-input">
+                <text class="picker-text" :class="{ 'picker-text-placeholder': !form.birth_place }">
+                  {{ form.birth_place || '请选择出生地' }}
+                </text>
+                <text class="picker-arrow">›</text>
+              </view>
+            </picker>
           </view>
 
           <view class="form-group">
@@ -194,7 +201,7 @@ import {
   createPayOrder,
   getPayStatus
 } from "@/api/module/pay.js";
-import { generateReport } from "@/api/module/lifeReport.js";
+import { generateReport, getRegions } from "@/api/module/lifeReport.js";
 import { getCaptchaImage } from "@/api/module/captcha.js";
 import { isHandledError } from "@/api/request.js";
 
@@ -218,6 +225,12 @@ const captchaImg = ref("");
 const captchaUuid = ref("");
 const captchaCode = ref("");
 const captchaLoading = ref(false);
+
+// 地区选择器
+const regionList = ref([]);       // 原始数据 [{country, province[]}]
+const pickerRange = ref([[], []]); // 两列：国家列表、当前国家的省份列表
+const pickerValue = ref([0, 0]);   // 当前选中索引 [countryIdx, provinceIdx]
+const selectedProvince = ref("");  // 最终选中的省份名称（作为 city 传入）
 
 // 支付订单
 let currentOrderNo = "";
@@ -244,6 +257,50 @@ const fetchPrice = async () => {
     if (!isHandledError(e)) console.error("价格查询失败", e);
   } finally {
     priceLoading.value = false;
+  }
+};
+
+// 拉取地区数据
+const fetchRegions = async () => {
+  try {
+    const res = await getRegions();
+    if (res?.code === 200 && res.data && typeof res.data === "object") {
+      // data 是对象：{ "中国大陆": { locations: { "北京市": {...} } }, ... }
+      const entries = Object.entries(res.data);
+      regionList.value = entries.map(([country, info]) => ({
+        country,
+        provinces: Object.keys(info.locations || {})
+      }));
+      if (regionList.value.length > 0) {
+        pickerRange.value = [
+          regionList.value.map((item) => item.country),
+          regionList.value[0].provinces
+        ];
+      }
+    }
+  } catch (e) {
+    if (!isHandledError(e)) console.error("地区数据加载失败", e);
+  }
+};
+
+// 地区选择器 — 列变化（第一列切换国家时，第二列省份联动）
+const onRegionColumnChange = (e) => {
+  const { column, value } = e.detail;
+  if (column === 0 && regionList.value[value]) {
+    pickerRange.value[1] = regionList.value[value].provinces || [];
+    pickerValue.value[1] = 0;
+  }
+};
+
+// 地区选择器 — 确认选择
+const onRegionChange = (e) => {
+  const [cIdx, pIdx] = e.detail.value;
+  pickerValue.value = [cIdx, pIdx];
+  if (regionList.value[cIdx]) {
+    const country = regionList.value[cIdx].country;
+    const province = regionList.value[cIdx].provinces?.[pIdx] || "";
+    selectedProvince.value = province;
+    form.birth_place = province ? `${country} ${province}` : country;
   }
 };
 
@@ -567,7 +624,7 @@ const onPaySuccess = async () => {
 
   uni.showLoading({ title: "正在生成报告..." });
   try {
-    const city = form.birth_place || "";
+    const city = selectedProvince.value || form.birth_place || "";
     const genRes = await generateReport({
       orderNo: currentOrderNo,
       solarDate: form.solar_date,
@@ -602,6 +659,7 @@ const onPaySuccess = async () => {
 
 onShow(() => {
   fetchPrice();
+  fetchRegions();
 });
 
 onUnmounted(() => {
