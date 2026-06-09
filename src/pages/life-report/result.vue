@@ -1192,10 +1192,12 @@ onPageScroll((e) => {
 
         <!-- 年度生活节奏指引 -->
         <view id="guide-card" class="guide-card">
-          <text class="guide-time"
-            >{{ tr("时间参考") }}：{{ targetYear }} ·
-            {{ annualStemBranch || tr("常年") }}</text
-          >
+          <text class="guide-time">
+            {{ tr("时间参考：") }}{{
+              reportData.targetDate ||
+                targetYear + " · " + (annualStemBranch || tr("常年"))
+            }}
+          </text>
           <text class="guide-title">{{ annualRhythmTitle }}</text>
           <text class="guide-desc">{{ annualRhythmDesc }}</text>
         </view>
