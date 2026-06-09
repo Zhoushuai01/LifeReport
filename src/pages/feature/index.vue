@@ -34,11 +34,6 @@
       </view>
     </view>
 
-    <!-- 历史记录入口 -->
-    <view class="history-entry">
-      <text class="history-entry-text">查看历史记录</text>
-      <text class="history-entry-arrow">›</text>
-    </view>
   </view>
 </template>
 
@@ -198,25 +193,5 @@ onShow(() => {
   font-weight: 700;
   color: #ffffff;
   letter-spacing: 1rpx;
-}
-
-/* ===== 历史记录 ===== */
-.history-entry {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6rpx;
-  padding: 32rpx 0 0;
-}
-
-.history-entry-text {
-  font-size: 26rpx;
-  color: #b37a0a;
-  font-weight: 500;
-}
-
-.history-entry-arrow {
-  font-size: 28rpx;
-  color: #b37a0a;
 }
 </style>

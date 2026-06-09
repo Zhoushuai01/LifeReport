@@ -13,6 +13,12 @@
 			}
 		},
 		{
+			"path": "pages/life-report/query",
+			"style": {
+				"navigationBarTitleText": "查询报告"
+			}
+		},
+		{
 			"path": "pages/life-report/result",
 			"style": {
 				"navigationBarTitleText": "人生报告"

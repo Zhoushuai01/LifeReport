@@ -1,10 +1,11 @@
-﻿﻿﻿<script setup>
+﻿﻿<script setup>
 import { ref, computed, reactive } from "vue";
 import { onLoad, onPageScroll } from "@dcloudio/uni-app";
 import { generateReport } from "@/api/module/pay.js";
+import { getReportData } from "@/api/module/lifeReport.js";
 
 const tr = (s) => s;
-const getStaticPath = (p) => `/${p}`;
+const getStaticPath = (p) => `/static/${p}`;
 
 const loading = ref(true);
 const isDownloading = ref(false);
@@ -35,16 +36,19 @@ const queryForm = reactive({
   solar_date: "",
   birth_time: "",
   gender: "",
-  birth_place: ""
+  birth_place: "",
 });
 
 onLoad(async (options) => {
   if (options) {
     if (options.name) queryForm.name = decodeURIComponent(options.name);
-    if (options.solar_date) queryForm.solar_date = decodeURIComponent(options.solar_date);
-    if (options.birth_time) queryForm.birth_time = decodeURIComponent(options.birth_time);
+    if (options.solar_date)
+      queryForm.solar_date = decodeURIComponent(options.solar_date);
+    if (options.birth_time)
+      queryForm.birth_time = decodeURIComponent(options.birth_time);
     if (options.gender) queryForm.gender = decodeURIComponent(options.gender);
-    if (options.birth_place) queryForm.birth_place = decodeURIComponent(options.birth_place);
+    if (options.birth_place)
+      queryForm.birth_place = decodeURIComponent(options.birth_place);
   }
 
   // 获取订单号：优先从 URL 参数读取（支付宝回跳），其次 localStorage（同窗口支付）
@@ -52,7 +56,9 @@ onLoad(async (options) => {
   if (!orderNo) {
     try {
       orderNo = localStorage.getItem("report_order_no") || "";
-    } catch (_) { /* ignore */ }
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   if (!orderNo) {
@@ -61,17 +67,24 @@ onLoad(async (options) => {
     return;
   }
 
+  const isQueryMode = options?.mode === "query";
+
   try {
-    const res = await generateReport({
-      orderNo,
-      solarDate: queryForm.solar_date || undefined,
-      birthTime: queryForm.birth_time || undefined,
-      gender: queryForm.gender || undefined,
-      city: queryForm.birth_place || undefined
-    });
+    let res;
+    if (isQueryMode) {
+      res = await getReportData({ orderNo });
+    } else {
+      res = await generateReport({
+        orderNo,
+        solarDate: queryForm.solar_date || undefined,
+        birthTime: queryForm.birth_time || undefined,
+        gender: queryForm.gender || undefined,
+        city: queryForm.birth_place || undefined,
+      });
+    }
 
     if (res?.code !== 200) {
-      throw new Error(res?.msg || "生成报告失败");
+      throw new Error(res?.msg || "获取报告失败");
     }
 
     const data = res.data;
@@ -79,28 +92,48 @@ onLoad(async (options) => {
       throw new Error("报告数据为空");
     }
 
+    // 查询模式：根据 genStatus 校验报告状态
+    if (isQueryMode) {
+      const genStatus = data.genStatus;
+      const statusMessages = {
+        0: "订单未支付",
+        1: "报告生成中，请稍后查看",
+        3: "报告生成失败，请联系客服退款",
+        4: "报告生成失败，已退款",
+      };
+      if (genStatus !== 2) {
+        throw new Error(statusMessages[genStatus] || `未知状态`);
+      }
+    }
+
     // genData 是 JSON 字符串，需要解析
     let tempGenData = {};
     if (data.genData) {
       try {
-        tempGenData = typeof data.genData === "string" ? JSON.parse(data.genData) : data.genData;
+        tempGenData =
+          typeof data.genData === "string"
+            ? JSON.parse(data.genData)
+            : data.genData;
         // 打印 genData 顶层所有字段
         console.log("[genData top-level keys]", Object.keys(tempGenData));
         // 打印 complete_data 字段
         if (tempGenData.complete_data) {
-          console.log("[genData complete_data keys]", Object.keys(tempGenData.complete_data));
+          console.log(
+            "[genData complete_data keys]",
+            Object.keys(tempGenData.complete_data),
+          );
           // 打印 display_report 字段
           if (tempGenData.complete_data.display_report) {
             const dr = tempGenData.complete_data.display_report;
             console.log("[display_report keys]", Object.keys(dr));
             // 打印每个子模块的字段
-            Object.keys(dr).forEach(key => {
+            Object.keys(dr).forEach((key) => {
               const val = dr[key];
-              if (val && typeof val === 'object' && !Array.isArray(val)) {
+              if (val && typeof val === "object" && !Array.isArray(val)) {
                 console.log(`[${key} keys]`, Object.keys(val));
               } else if (Array.isArray(val)) {
                 console.log(`[${key}] array length:`, val.length);
-                if (val.length > 0 && typeof val[0] === 'object') {
+                if (val.length > 0 && typeof val[0] === "object") {
                   console.log(`[${key}[0] keys]`, Object.keys(val[0]));
                 }
               } else {
@@ -126,7 +159,9 @@ onLoad(async (options) => {
 
     // 组装基础报告展示数据
     reportData.value = {
-      name: dr.birth_info?.solar_date ? queryForm.name || "—" : queryForm.name || "—",
+      name: dr.birth_info?.solar_date
+        ? queryForm.name || "—"
+        : queryForm.name || "—",
       birth: dr.birth_info?.solar_date || queryForm.solar_date || "—",
       trueSolarDate: dr.birth_info?.true_solar_date || "",
       birthTime: dr.birth_info?.birth_time || queryForm.birth_time || "—",
@@ -140,7 +175,7 @@ onLoad(async (options) => {
       currentMonth: dr.report_meta?.current_month || "",
       targetYear: dr.report_meta?.target_year || "",
       generatedAt: dr.report_meta?.generated_at || "",
-      disclaimer: dr.report_meta?.disclaimer || ""
+      disclaimer: dr.report_meta?.disclaimer || "",
     };
   } catch (e) {
     console.error("[result] generateReport error", e);
@@ -156,7 +191,7 @@ const topCardItems = computed(() => [
   { label: "出生", value: reportData.value.birth || "—" },
   { label: "时间", value: reportData.value.birthTime || "—" },
   { label: "地点", value: reportData.value.place || "—" },
-  { label: "性别", value: reportData.value.gender || "—" }
+  { label: "性别", value: reportData.value.gender || "—" },
 ]);
 
 // 快速导航（模板中 v-if="false" 隐藏，但仍需定义以防 lint 警告）
@@ -165,16 +200,47 @@ const navSections = [
   { id: "decade-card", label: "十年行旅" },
   { id: "annual-card", label: "年度主题" },
   { id: "monthly-card", label: "每月旋律" },
-  { id: "guide-card", label: "节奏指引" }
+  { id: "guide-card", label: "节奏指引" },
 ];
 
 const fastReadItems = computed(() => [
-  { icon: getStaticPath("images/life-report/date-icon.png"), label: "年度", value: String(getDR("report_meta.target_year", new Date().getFullYear())) },
-  { icon: getStaticPath("images/life-report/book-icon.png"), label: "当前月份", value: String(getDR("report_meta.current_month", new Date().getMonth() + 1)) + tr("月") },
-  { icon: getStaticPath("images/life-report/ring-icon.png"), label: "月度提醒", value: "12" + tr("个月") },
-  { icon: getStaticPath("images/life-report/position-icon.png"), label: "生活十问", value: "10" + tr("个问题") },
-  { icon: getStaticPath("images/life-report/date-icon.png"), label: "空间建议", value: "5" + tr("个角落") },
-  { icon: getStaticPath("images/life-report/book-icon.png"), label: "生活十问", value: (tenQuestionsSamples.value[0]?.display_question || tenQuestionsSamples.value[0]?.question || "").slice(0, 12) + "..." }
+  {
+    icon: getStaticPath("life-report/date-icon.png"),
+    label: "年度",
+    value: String(getDR("report_meta.target_year", new Date().getFullYear())),
+  },
+  {
+    icon: getStaticPath("life-report/book-icon.png"),
+    label: "当前月份",
+    value:
+      String(getDR("report_meta.current_month", new Date().getMonth() + 1)) +
+      tr("月"),
+  },
+  {
+    icon: getStaticPath("life-report/ring-icon.png"),
+    label: "月度提醒",
+    value: "12" + tr("个月"),
+  },
+  {
+    icon: getStaticPath("life-report/position-icon.png"),
+    label: "生活十问",
+    value: "10" + tr("个问题"),
+  },
+  {
+    icon: getStaticPath("life-report/date-icon.png"),
+    label: "空间建议",
+    value: "5" + tr("个角落"),
+  },
+  {
+    icon: getStaticPath("life-report/book-icon.png"),
+    label: "生活十问",
+    value:
+      (
+        tenQuestionsSamples.value[0]?.display_question ||
+        tenQuestionsSamples.value[0]?.question ||
+        ""
+      ).slice(0, 12) + "...",
+  },
 ]);
 
 // 当前月份标题（用于快速阅读）
@@ -188,23 +254,46 @@ const currentMonthTitle = computed(() => {
 });
 
 // 十年行旅 - 全部从 API 数据动态读取
-const decadePeriod = computed(() => getDR("ten_year_journey.period", "25-34岁"));
-const decadeMainRhythm = computed(() => getDR("ten_year_journey.main_rhythm", "成长期：构建基础与方向"));
-const decadeSummary = computed(() => getDR("ten_year_journey.summary", "这一阶段是打基础的时段。"));
+const decadePeriod = computed(() =>
+  getDR("ten_year_journey.period", "25-34岁"),
+);
+const decadeMainRhythm = computed(() =>
+  getDR("ten_year_journey.main_rhythm", "成长期：构建基础与方向"),
+);
+const decadeSummary = computed(() =>
+  getDR("ten_year_journey.summary", "这一阶段是打基础的时段。"),
+);
 const decadeTags = computed(() => {
   const tags = getDR("ten_year_journey.tags", []);
   return Array.isArray(tags) ? tags : ["立业", "筑基"];
 });
-const decadeSihuaSummary = computed(() => getDR("ten_year_journey.sihua_theme.summary", "围绕事业、关系、学习三条主线推进。"));
+const decadeSihuaSummary = computed(() =>
+  getDR(
+    "ten_year_journey.sihua_theme.summary",
+    "围绕事业、关系、学习三条主线推进。",
+  ),
+);
 const decadeThemes = computed(() => {
   const list = getDR("ten_year_journey.sihua_theme.transformations", []);
   if (!Array.isArray(list) || list.length === 0) {
     return [
-      { type: "滋养主题", star: "边界感", palace: "职业发展", display_name: "职场归位 稳步积能", detail: "守住自身节奏边界。" },
-      { type: "推动主题", star: "更新力", palace: "内在满足", display_name: "向内校准心境", detail: "每周梳理心绪。" }
+      {
+        type: "滋养主题",
+        star: "边界感",
+        palace: "职业发展",
+        display_name: "职场归位 稳步积能",
+        detail: "守住自身节奏边界。",
+      },
+      {
+        type: "推动主题",
+        star: "更新力",
+        palace: "内在满足",
+        display_name: "向内校准心境",
+        detail: "每周梳理心绪。",
+      },
     ];
   }
-  return list.map(t => ({
+  return list.map((t) => ({
     type: t.type || "",
     star: t.star || "",
     palace: t.palace || "",
@@ -213,64 +302,142 @@ const decadeThemes = computed(() => {
     tag: t.display_name || t.type || "主题",
     title: t.display_name || "主题",
     desc: t.detail || "",
-    bg: t.type === "滋养主题" ? "#eef6ff" : t.type === "推动主题" ? "#fff7e6" : t.type === "修复主题" ? "#f0f9eb" : "#fdf2f0"
+    bg:
+      t.type === "滋养主题"
+        ? "#eef6ff"
+        : t.type === "推动主题"
+          ? "#fff7e6"
+          : t.type === "修复主题"
+            ? "#f0f9eb"
+            : "#fdf2f0",
   }));
 });
 
 // 十二个生活主题 - 从 palaceSummaries 动态生成
 const lifeThemeIcons = [
-  "images/life-report/date-icon.png",
-  "images/life-report/book-icon.png",
-  "images/life-report/ring-icon.png",
-  "images/life-report/position-icon.png"
+  "life-report/date-icon.png",
+  "life-report/book-icon.png",
+  "life-report/ring-icon.png",
+  "life-report/position-icon.png",
 ];
 const allLifeThemes = computed(() => {
   const palaces = palaceSummaries.value;
   if (palaces.length === 0) {
     // 兜底静态数据
     return [
-      { icon: getStaticPath("images/life-report/date-icon.png"), title: "事业节奏", desc: "把握关键节点" },
-      { icon: getStaticPath("images/life-report/book-icon.png"), title: "关系维护", desc: "定期联系核心亲友" },
-      { icon: getStaticPath("images/life-report/ring-icon.png"), title: "健康管理", desc: "睡眠 + 运动双线推进" },
-      { icon: getStaticPath("images/life-report/position-icon.png"), title: "财务规划", desc: "建立应急与长期账户" },
-      { icon: getStaticPath("images/life-report/date-icon.png"), title: "学习成长", desc: "每周阅读 + 复盘" },
-      { icon: getStaticPath("images/life-report/book-icon.png"), title: "兴趣探索", desc: "留出探索时间" },
-      { icon: getStaticPath("images/life-report/ring-icon.png"), title: "家庭生活", desc: "仪式感与陪伴" },
-      { icon: getStaticPath("images/life-report/position-icon.png"), title: "社交拓展", desc: "高质量弱关系" },
-      { icon: getStaticPath("images/life-report/date-icon.png"), title: "心态调适", desc: "正念与情绪记录" },
-      { icon: getStaticPath("images/life-report/book-icon.png"), title: "空间整理", desc: "定期断舍离" },
-      { icon: getStaticPath("images/life-report/ring-icon.png"), title: "时间管理", desc: "重要不紧急优先" },
-      { icon: getStaticPath("images/life-report/position-icon.png"), title: "目标管理", desc: "季度复盘" }
+      {
+        icon: getStaticPath("life-report/date-icon.png"),
+        title: "事业节奏",
+        desc: "把握关键节点",
+      },
+      {
+        icon: getStaticPath("life-report/book-icon.png"),
+        title: "关系维护",
+        desc: "定期联系核心亲友",
+      },
+      {
+        icon: getStaticPath("life-report/ring-icon.png"),
+        title: "健康管理",
+        desc: "睡眠 + 运动双线推进",
+      },
+      {
+        icon: getStaticPath("life-report/position-icon.png"),
+        title: "财务规划",
+        desc: "建立应急与长期账户",
+      },
+      {
+        icon: getStaticPath("life-report/date-icon.png"),
+        title: "学习成长",
+        desc: "每周阅读 + 复盘",
+      },
+      {
+        icon: getStaticPath("life-report/book-icon.png"),
+        title: "兴趣探索",
+        desc: "留出探索时间",
+      },
+      {
+        icon: getStaticPath("life-report/ring-icon.png"),
+        title: "家庭生活",
+        desc: "仪式感与陪伴",
+      },
+      {
+        icon: getStaticPath("life-report/position-icon.png"),
+        title: "社交拓展",
+        desc: "高质量弱关系",
+      },
+      {
+        icon: getStaticPath("life-report/date-icon.png"),
+        title: "心态调适",
+        desc: "正念与情绪记录",
+      },
+      {
+        icon: getStaticPath("life-report/book-icon.png"),
+        title: "空间整理",
+        desc: "定期断舍离",
+      },
+      {
+        icon: getStaticPath("life-report/ring-icon.png"),
+        title: "时间管理",
+        desc: "重要不紧急优先",
+      },
+      {
+        icon: getStaticPath("life-report/position-icon.png"),
+        title: "目标管理",
+        desc: "季度复盘",
+      },
     ];
   }
   return palaces.map((p, i) => ({
     icon: getStaticPath(lifeThemeIcons[i % lifeThemeIcons.length]),
     title: p.palace || p.module || `宫位${i + 1}`,
-    desc: p.summary || ""
+    desc: p.summary || "",
   }));
 });
 const lifeThemesExpanded = ref(false);
 const displayedLifeThemes = computed(() =>
-  lifeThemesExpanded.value ? allLifeThemes.value : allLifeThemes.value.slice(0, 4)
+  lifeThemesExpanded.value
+    ? allLifeThemes.value
+    : allLifeThemes.value.slice(0, 4),
 );
 const toggleLifeThemes = () => {
   lifeThemesExpanded.value = !lifeThemesExpanded.value;
 };
 
 // 年度核心主题 - 全部从 API 数据动态读取
-const annualRhythmTitle = computed(() => getDR("annual_rhythm.title", "今年年度节奏主旋律"));
-const annualRhythmDesc = computed(() => getDR("annual_rhythm.summary", "今年整体节奏偏稳健。"));
-const annualCoreDesc = computed(() => getDR("annual_rhythm.sihua_theme.summary", "围绕'建立秩序'展开。"));
+const annualRhythmTitle = computed(() =>
+  getDR("annual_rhythm.title", "今年年度节奏主旋律"),
+);
+const annualRhythmDesc = computed(() =>
+  getDR("annual_rhythm.summary", "今年整体节奏偏稳健。"),
+);
+const annualCoreDesc = computed(() =>
+  getDR("annual_rhythm.sihua_theme.summary", "围绕'建立秩序'展开。"),
+);
 const annualThemeCards = computed(() => {
   const list = getDR("annual_rhythm.sihua_theme.transformations", []);
   if (!Array.isArray(list) || list.length === 0) {
     return [
-      { tag: "事业", title: "建立秩序", desc: "把核心项目从 0 推到 1", bg: "#fff7e6" },
-      { tag: "关系", title: "深度连接", desc: "与 3 位重要的人深度沟通", bg: "#fdf2f0" },
-      { tag: "自我", title: "稳态作息", desc: "睡眠 7+ 小时/天", bg: "#eef6ff" }
+      {
+        tag: "事业",
+        title: "建立秩序",
+        desc: "把核心项目从 0 推到 1",
+        bg: "#fff7e6",
+      },
+      {
+        tag: "关系",
+        title: "深度连接",
+        desc: "与 3 位重要的人深度沟通",
+        bg: "#fdf2f0",
+      },
+      {
+        tag: "自我",
+        title: "稳态作息",
+        desc: "睡眠 7+ 小时/天",
+        bg: "#eef6ff",
+      },
     ];
   }
-  return list.map(t => ({
+  return list.map((t) => ({
     type: t.type || "",
     star: t.star || "",
     palace: t.palace || "",
@@ -279,12 +446,32 @@ const annualThemeCards = computed(() => {
     tag: t.display_name || t.type || "主题",
     title: t.display_name || "主题",
     desc: t.detail || "",
-    bg: t.type === "滋养主题" ? "#eef6ff" : t.type === "推动主题" ? "#fff7e6" : t.type === "修复主题" ? "#f0f9eb" : "#fdf2f0"
+    bg:
+      t.type === "滋养主题"
+        ? "#eef6ff"
+        : t.type === "推动主题"
+          ? "#fff7e6"
+          : t.type === "修复主题"
+            ? "#f0f9eb"
+            : "#fdf2f0",
   }));
 });
 
 // 每月旋律 - 从 API 数据动态读取
-const months = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
+const months = [
+  "1月",
+  "2月",
+  "3月",
+  "4月",
+  "5月",
+  "6月",
+  "7月",
+  "8月",
+  "9月",
+  "10月",
+  "11月",
+  "12月",
+];
 const selectedMonth = ref(new Date().getMonth() + 1);
 const selectMonth = (m) => {
   selectedMonth.value = m;
@@ -295,7 +482,7 @@ const monthlyDataMap = computed(() => {
   const list = getDR("monthly_rhythms", []);
   const map = {};
   if (Array.isArray(list)) {
-    list.forEach(item => {
+    list.forEach((item) => {
       if (item.month) map[item.month] = item;
     });
   }
@@ -310,20 +497,24 @@ const monthContents = computed(() => {
     let desc = data.summary || "";
     return {
       title: data.title || `${m}月`,
-      desc: desc
+      desc: desc,
     };
   }
   return {
     title: `${m}月`,
-    desc: "暂无数据"
+    desc: "暂无数据",
   };
 });
 
 // ====== 以下为从 API 后端数据动态读取的补充字段 ======
 
 // ten_year_journey 补充字段
-const tenYearJourneyTitle = computed(() => getDR("ten_year_journey.display_title", "十年行旅"));
-const decadeSourceTimeLevel = computed(() => getDR("ten_year_journey.source_time_level", ""));
+const tenYearJourneyTitle = computed(() =>
+  getDR("ten_year_journey.display_title", "十年行旅"),
+);
+const decadeSourceTimeLevel = computed(() =>
+  getDR("ten_year_journey.source_time_level", ""),
+);
 
 // palace_summaries - 十二宫运势完整列表
 const palaceSummaries = computed(() => {
@@ -333,40 +524,66 @@ const palaceSummaries = computed(() => {
 
 // annual_rhythm 补充字段
 const annualSource = computed(() => getDR("annual_rhythm.source", ""));
-const annualStemBranch = computed(() => getDR("annual_rhythm.sihua_theme.annual_stem_branch", ""));
+const annualStemBranch = computed(() =>
+  getDR("annual_rhythm.sihua_theme.annual_stem_branch", ""),
+);
 
 // future_guidance 未来指引
-const futureGuidanceTitle = computed(() => getDR("future_guidance.title", "日常行旅指引"));
-const futureGuidanceSummary = computed(() => getDR("future_guidance.summary", "暂无未来指引数据"));
+const futureGuidanceTitle = computed(() =>
+  getDR("future_guidance.title", "日常行旅指引"),
+);
+const futureGuidanceSummary = computed(() =>
+  getDR("future_guidance.summary", "暂无未来指引数据"),
+);
 
 // ten_questions - 生活十问
-const tenQuestionsSourceEndpoint = computed(() => getDR("ten_questions.source_endpoint", ""));
+const tenQuestionsSourceEndpoint = computed(() =>
+  getDR("ten_questions.source_endpoint", ""),
+);
 const tenQuestionsTimeLevels = computed(() => {
   const list = getDR("ten_questions.supported_time_levels", []);
   if (!Array.isArray(list) || list.length === 0) {
     return [
-      { value: "yearly", label: "今年", usage: "看当年问题的建议。", bg: "#fff7e6" },
-      { value: "monthly", label: "本月", usage: "看当月行动提醒。", bg: "#eef6ff" }
+      {
+        value: "yearly",
+        label: "今年",
+        usage: "看当年问题的建议。",
+        bg: "#fff7e6",
+      },
+      {
+        value: "monthly",
+        label: "本月",
+        usage: "看当月行动提醒。",
+        bg: "#eef6ff",
+      },
     ];
   }
   return list.map((t, i) => ({
     ...t,
-    bg: i % 2 === 0 ? "#fff7e6" : "#eef6ff"
+    bg: i % 2 === 0 ? "#fff7e6" : "#eef6ff",
   }));
 });
 const tenQuestionsFields = computed(() => {
   const list = getDR("ten_questions.available_fields", []);
   if (!Array.isArray(list) || list.length === 0) {
     return [
-      { icon: getStaticPath("images/life-report/date-icon.png"), label: "行动方向", desc: "适合沟通、整理或行动的空间参考。" },
-      { icon: getStaticPath("images/life-report/book-icon.png"), label: "协作线索", desc: "可作为人际协作的趣味提示。" }
+      {
+        icon: getStaticPath("life-report/date-icon.png"),
+        label: "行动方向",
+        desc: "适合沟通、整理或行动的空间参考。",
+      },
+      {
+        icon: getStaticPath("life-report/book-icon.png"),
+        label: "协作线索",
+        desc: "可作为人际协作的趣味提示。",
+      },
     ];
   }
-  return list.map(f => ({
-    icon: getStaticPath("images/life-report/date-icon.png"),
+  return list.map((f) => ({
+    icon: getStaticPath("life-report/date-icon.png"),
     label: f.field || "",
     sub: "",
-    desc: f.desc || ""
+    desc: f.desc || "",
   }));
 });
 const tenQuestionsSamples = computed(() => {
@@ -381,35 +598,47 @@ const tenQuestionsSamples = computed(() => {
         secondary_surnames: "管、和",
         colors: "青色、綠色",
         direction: "东南",
-        palace: "职业选择"
-      }
+        palace: "职业选择",
+      },
     ];
   }
-  return list.map(s => ({
+  return list.map((s) => ({
     raw_id: s.raw_id || "",
     display_question: s.display_question || "",
     palace: s.palace || "",
     direction: s.direction || "",
     advice: s.ai_advice || "",
-    colors: Array.isArray(s.favorable_colors) ? s.favorable_colors.join("、") : (s.favorable_colors || ""),
-    primary_surnames: Array.isArray(s.noble_surnames?.primary) ? s.noble_surnames.primary.join("、") : (s.noble_surnames?.primary || ""),
-    secondary_surnames: Array.isArray(s.noble_surnames?.secondary) ? s.noble_surnames.secondary.join("、") : (s.noble_surnames?.secondary || ""),
+    colors: Array.isArray(s.favorable_colors)
+      ? s.favorable_colors.join("、")
+      : s.favorable_colors || "",
+    primary_surnames: Array.isArray(s.noble_surnames?.primary)
+      ? s.noble_surnames.primary.join("、")
+      : s.noble_surnames?.primary || "",
+    secondary_surnames: Array.isArray(s.noble_surnames?.secondary)
+      ? s.noble_surnames.secondary.join("、")
+      : s.noble_surnames?.secondary || "",
     strategy: s.source_fields?.strategy || "",
     main_element: s.source_fields?.main_element || "",
     question: s.display_question || "",
     badge: s.palace || "",
-    clue: Array.isArray(s.favorable_colors) ? s.favorable_colors.join("、") : (s.favorable_colors || ""),
-    color: Array.isArray(s.favorable_colors) ? s.favorable_colors.join("、") : (s.favorable_colors || ""),
-    theme: s.palace || ""
+    clue: Array.isArray(s.favorable_colors)
+      ? s.favorable_colors.join("、")
+      : s.favorable_colors || "",
+    color: Array.isArray(s.favorable_colors)
+      ? s.favorable_colors.join("、")
+      : s.favorable_colors || "",
+    theme: s.palace || "",
   }));
 });
 
 // ====== fengshui_advice 动态数据 ======
-const fengshuiSourceEndpoint = computed(() => getDR("fengshui_advice.source_endpoint", ""));
+const fengshuiSourceEndpoint = computed(() =>
+  getDR("fengshui_advice.source_endpoint", ""),
+);
 const fengshuiSamples = computed(() => {
   const list = getDR("fengshui_advice.samples", []);
   if (!Array.isArray(list)) return [];
-  return list.map(s => ({
+  return list.map((s) => ({
     elementClass: "default",
     // 方向/元素
     element: s.direction || "",
@@ -420,8 +649,12 @@ const fengshuiSamples = computed(() => {
     // 完整建议
     desc: s.ai_advice || s.strategy || "",
     // 颜色 - 从数组转字符串
-    color: Array.isArray(s.favorable_colors) ? s.favorable_colors.join("、") : (s.favorable_colors || ""),
-    favorable_color: Array.isArray(s.favorable_colors) ? s.favorable_colors.join("、") : (s.favorable_colors || ""),
+    color: Array.isArray(s.favorable_colors)
+      ? s.favorable_colors.join("、")
+      : s.favorable_colors || "",
+    favorable_color: Array.isArray(s.favorable_colors)
+      ? s.favorable_colors.join("、")
+      : s.favorable_colors || "",
     // 协作线索 - 贵人姓氏
     clue: (() => {
       const p = s.noble_surnames?.primary;
@@ -435,18 +668,26 @@ const fengshuiSamples = computed(() => {
     theme: s.palace || s.label || "",
     palace: s.palace || "",
     // 空间小物 - 数组转字符串
-    items: Array.isArray(s.items) ? s.items.join("；") : (s.items || ""),
-    suggested_items: Array.isArray(s.items) ? s.items.join("；") : (s.items || ""),
+    items: Array.isArray(s.items) ? s.items.join("；") : s.items || "",
+    suggested_items: Array.isArray(s.items)
+      ? s.items.join("；")
+      : s.items || "",
     // 象征图案 - 数组转字符串
-    symbol: Array.isArray(s.symbolic_shapes) ? s.symbolic_shapes.join("；") : (s.symbolic_shapes || ""),
-    suggested_symbol: Array.isArray(s.symbolic_shapes) ? s.symbolic_shapes.join("；") : (s.symbolic_shapes || ""),
+    symbol: Array.isArray(s.symbolic_shapes)
+      ? s.symbolic_shapes.join("；")
+      : s.symbolic_shapes || "",
+    suggested_symbol: Array.isArray(s.symbolic_shapes)
+      ? s.symbolic_shapes.join("；")
+      : s.symbolic_shapes || "",
     // 策略
-    strategy: s.strategy || ""
+    strategy: s.strategy || "",
   }));
 });
 
 // future_guidance 补充
-const futureGuidanceSource = computed(() => getDR("future_guidance.source", ""));
+const futureGuidanceSource = computed(() =>
+  getDR("future_guidance.source", ""),
+);
 
 // 年度四化补充
 const annualSihuaTheme = computed(() => {
@@ -456,28 +697,53 @@ const annualSihuaTheme = computed(() => {
 
 // 空间五建议 - 从 API available_fields 动态渲染
 const fengshuiFieldIcons = [
-  getStaticPath("images/life-report/position-icon.png"),
-  getStaticPath("images/life-report/ring-icon.png"),
-  getStaticPath("images/life-report/book-icon.png"),
-  getStaticPath("images/life-report/date-icon.png"),
-  getStaticPath("images/life-report/ring-icon.png")
+  getStaticPath("life-report/position-icon.png"),
+  getStaticPath("life-report/ring-icon.png"),
+  getStaticPath("life-report/book-icon.png"),
+  getStaticPath("life-report/date-icon.png"),
+  getStaticPath("life-report/ring-icon.png"),
 ];
 const fengshuiFields = computed(() => {
   const list = getDR("fengshui_advice.available_fields", []);
   if (!Array.isArray(list) || list.length === 0) {
     return [
-      { icon: getStaticPath("images/life-report/position-icon.png"), label: "整理方向", sub: "", desc: "空间整理或摆放方向参考。" },
-      { icon: getStaticPath("images/life-report/ring-icon.png"), label: "舒缓颜色", sub: "", desc: "用于环境色彩或随身搭配。" },
-      { icon: getStaticPath("images/life-report/book-icon.png"), label: "空间小物", sub: "", desc: "用户端建议转译为日常可见的小物件。" },
-      { icon: getStaticPath("images/life-report/date-icon.png"), label: "象征图案", sub: "", desc: "用于贴纸、卡片、桌面图案等轻量表达。" },
-      { icon: getStaticPath("images/life-report/ring-icon.png"), label: "协作线索", sub: "", desc: "人际协作趣味参考，不承诺具体对象。" }
+      {
+        icon: getStaticPath("life-report/position-icon.png"),
+        label: "整理方向",
+        sub: "",
+        desc: "空间整理或摆放方向参考。",
+      },
+      {
+        icon: getStaticPath("life-report/ring-icon.png"),
+        label: "舒缓颜色",
+        sub: "",
+        desc: "用于环境色彩或随身搭配。",
+      },
+      {
+        icon: getStaticPath("life-report/book-icon.png"),
+        label: "空间小物",
+        sub: "",
+        desc: "用户端建议转译为日常可见的小物件。",
+      },
+      {
+        icon: getStaticPath("life-report/date-icon.png"),
+        label: "象征图案",
+        sub: "",
+        desc: "用于贴纸、卡片、桌面图案等轻量表达。",
+      },
+      {
+        icon: getStaticPath("life-report/ring-icon.png"),
+        label: "协作线索",
+        sub: "",
+        desc: "人际协作趣味参考，不承诺具体对象。",
+      },
     ];
   }
   return list.map((f, i) => ({
     icon: fengshuiFieldIcons[i % fengshuiFieldIcons.length],
     label: f.field || "",
     sub: "",
-    desc: f.desc || ""
+    desc: f.desc || "",
   }));
 });
 const fengshuiCorners = [
@@ -492,7 +758,7 @@ const fengshuiCorners = [
     theme: "立业",
     items: "小型绿植 / 文昌塔",
     symbol: "竹 / 书",
-    strategy: "保持整洁 + 自然光"
+    strategy: "保持整洁 + 自然光",
   },
   {
     element: "南",
@@ -505,8 +771,8 @@ const fengshuiCorners = [
     theme: "关系",
     items: "暖色灯 / 照片墙",
     symbol: "太阳 / 花",
-    strategy: "明亮 + 整洁"
-  }
+    strategy: "明亮 + 整洁",
+  },
 ];
 
 // 年度轻调适 - 从 API 动态渲染
@@ -515,9 +781,21 @@ const lightAdjustItems = computed(() => {
   const targetYear = getDR("report_meta.target_year", new Date().getFullYear());
   const tags = getDR("ten_year_journey.tags", []);
   return [
-    { label: "当前阶段", value: period || "—", icon: getStaticPath("images/life-report/position-icon.png") },
-    { label: "年度", value: String(targetYear) + "年度", icon: getStaticPath("images/life-report/date-icon.png") },
-    { label: "年度关键词", value: Array.isArray(tags) && tags.length > 0 ? tags.join("、") : "—", icon: getStaticPath("images/life-report/book-icon.png") }
+    {
+      label: "当前阶段",
+      value: period || "—",
+      icon: getStaticPath("life-report/position-icon.png"),
+    },
+    {
+      label: "年度",
+      value: String(targetYear) + "年度",
+      icon: getStaticPath("life-report/date-icon.png"),
+    },
+    {
+      label: "年度关键词",
+      value: Array.isArray(tags) && tags.length > 0 ? tags.join("、") : "—",
+      icon: getStaticPath("life-report/book-icon.png"),
+    },
   ];
 });
 const rhythmDetail = computed(() => {
@@ -526,110 +804,105 @@ const rhythmDetail = computed(() => {
   const sihuaSummary = getDR("annual_rhythm.sihua_theme.summary", "");
   const tags = getDR("ten_year_journey.tags", []);
   // 从 annual_rhythm.sihua_theme.transformations 提取关键词
-  const transformations = getDR("annual_rhythm.sihua_theme.transformations", []);
-  const keywords = transformations.map(t => t.star).filter(Boolean);
+  const transformations = getDR(
+    "annual_rhythm.sihua_theme.transformations",
+    [],
+  );
+  const keywords = transformations.map((t) => t.star).filter(Boolean);
   return {
     label: "年度节奏与生活主题",
     title: annualTitle || "先稳节奏，再做选择",
-    desc: sihuaSummary || annualSummary || "把重要事项拆成沟通、财务、出行、身心四类清单，优先处理能降低压力和误会的动作。",
-    icon: getStaticPath("images/life-report/book-icon.png"),
+    desc:
+      sihuaSummary ||
+      annualSummary ||
+      "把重要事项拆成沟通、财务、出行、身心四类清单，优先处理能降低压力和误会的动作。",
+    icon: getStaticPath("life-report/book-icon.png"),
     tags: [
-      { label: "方向", value: (() => {
-        const fs = fengshuiSamples.value;
-        if (fs.length > 0 && fs[0].direction) return fs[0].direction;
-        return getDR("annual_rhythm.sihua_theme.transformations.0.palace", "东南");
-      })() },
-      { label: "颜色", value: (() => {
-        const fs = fengshuiSamples.value;
-        if (fs.length > 0 && fs[0].color) return fs[0].color;
-        const colors = getDR("annual_rhythm.sihua_theme.transformations.0.star", "");
-        return colors || "清爽色、稳定色";
-      })() },
-      { label: "协作线索", value: (() => {
-        const fs = fengshuiSamples.value;
-        if (fs.length > 0 && fs[0].clue) return fs[0].clue;
-        const p = getDR("annual_rhythm.sihua_theme.transformations.0.star", "");
-        return p || "程、宋、林";
-      })() }
-    ]
+      {
+        label: "方向",
+        value: (() => {
+          const fs = fengshuiSamples.value;
+          if (fs.length > 0 && fs[0].direction) return fs[0].direction;
+          return getDR(
+            "annual_rhythm.sihua_theme.transformations.0.palace",
+            "东南",
+          );
+        })(),
+      },
+      {
+        label: "颜色",
+        value: (() => {
+          const fs = fengshuiSamples.value;
+          if (fs.length > 0 && fs[0].color) return fs[0].color;
+          const colors = getDR(
+            "annual_rhythm.sihua_theme.transformations.0.star",
+            "",
+          );
+          return colors || "清爽色、稳定色";
+        })(),
+      },
+      {
+        label: "协作线索",
+        value: (() => {
+          const fs = fengshuiSamples.value;
+          if (fs.length > 0 && fs[0].clue) return fs[0].clue;
+          const p = getDR(
+            "annual_rhythm.sihua_theme.transformations.0.star",
+            "",
+          );
+          return p || "程、宋、林";
+        })(),
+      },
+    ],
   };
 });
 
-const disclaimerText = computed(() => reportData.value.disclaimer || "内容仅作为传统文化娱乐参考，不构成医疗、法律、金融、投资、婚恋或人生重大决策建议。");
+const disclaimerText = computed(
+  () =>
+    reportData.value.disclaimer ||
+    "内容仅作为传统文化娱乐参考，不构成医疗、法律、金融、投资、婚恋或人生重大决策建议。",
+);
 
-// 下载报告 — 整页生成 PDF
+// 下载报告 — 导出为图片
 const downloadReport = async () => {
   if (isDownloading.value) return;
   try {
     isDownloading.value = true;
-    uni.showLoading({ title: "正在生成PDF..." });
+    uni.showLoading({ title: "正在生成图片..." });
 
     // #ifdef H5
     const { default: html2canvas } = await import("html2canvas");
-    const { default: jsPDF } = await import("jspdf");
 
-    const pageEl = document.querySelector(".life-result-page .page-body");
-    if (!pageEl) {
+    const pageBody = document.querySelector(".life-result-page .page-body");
+    if (!pageBody) {
       uni.showToast({ title: "页面未就绪", icon: "none" });
       return;
     }
 
-    // 滚动到顶部确保完整截图
     window.scrollTo(0, 0);
     await new Promise((r) => setTimeout(r, 300));
 
-    const canvas = await html2canvas(pageEl, {
+    const canvas = await html2canvas(pageBody, {
       scale: 2,
       useCORS: true,
       allowTaint: false,
       backgroundColor: "#f7f7f3",
-      logging: false
+      logging: false,
     });
 
-    const imgData = canvas.toDataURL("image/jpeg", 0.95);
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
-
-    // A4 尺寸 (mm)
-    const a4Width = 210;
-    const a4Height = 297;
-    const margin = 10;
-    const contentWidth = a4Width - margin * 2;
-    const contentHeight = (contentWidth / imgWidth) * imgHeight;
-
-    const pdf = new jsPDF("p", "mm", "a4");
-    let position = margin;
-    let remainingHeight = contentHeight;
-    const pageContentHeight = a4Height - margin * 2;
-
-    while (remainingHeight > 0) {
-      if (position > margin) {
-        pdf.addPage();
-        position = margin;
-      }
-      const srcY = ((position - margin) / contentHeight) * imgHeight;
-      const srcH = Math.min(
-        (pageContentHeight / contentHeight) * imgHeight,
-        imgHeight - srcY
-      );
-
-      pdf.addImage(imgData, "JPEG", margin, position, contentWidth, (srcH / imgWidth) * contentWidth, undefined, "FAST", 0);
-
-      position += (srcH / imgWidth) * contentWidth;
-      remainingHeight -= (srcH / imgWidth) * contentWidth;
-    }
-
-    const fileName = `人生报告_${reportData.value.targetYear || new Date().getFullYear()}.pdf`;
-    pdf.save(fileName);
+    // 触发下载
+    const link = document.createElement("a");
+    link.download = `人生报告_${reportData.value.targetYear || new Date().getFullYear()}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
 
     uni.hideLoading();
-    uni.showToast({ title: "PDF已下载", icon: "none" });
+    uni.showToast({ title: "图片已下载", icon: "none" });
     // #endif
 
     // #ifndef H5
-    // 非 H5 端：提示当前环境暂不支持 PDF 下载
     uni.hideLoading();
-    uni.showToast({ title: "请在H5端下载PDF", icon: "none" });
+    uni.showToast({ title: "请在H5端下载", icon: "none" });
     // #endif
   } catch (e) {
     uni.hideLoading();
@@ -667,7 +940,9 @@ onPageScroll((e) => {
           class="loading-dot-wrap"
           v-for="i in 8"
           :key="i"
-          :style="{ transform: `rotate(${(i - 1) * 45}deg) translateY(-36rpx)` }"
+          :style="{
+            transform: `rotate(${(i - 1) * 45}deg) translateY(-36rpx)`,
+          }"
         >
           <view class="loading-dot" />
         </view>
@@ -679,29 +954,44 @@ onPageScroll((e) => {
     <!-- 错误提示 -->
     <view v-else-if="errorMsg" class="error-container">
       <text class="error-text">{{ errorMsg }}</text>
-      <view class="error-btn" @click="uni.navigateBack()">{{ tr("返回重试") }}</view>
+      <view class="error-btn" @click="uni.navigateBack()">{{
+        tr("返回重试")
+      }}</view>
     </view>
 
     <template v-else-if="reportData">
       <!-- 顶部背景 -->
-      <image class="top-bg" :src="getStaticPath('images/life-report/result-top.png')" mode="aspectFill" />
+      <image
+        class="top-bg"
+        :src="getStaticPath('life-report/result-top.png')"
+        mode="aspectFill"
+      />
 
-      <NavBar :showBack="true" backgroundColor="transparent" titleColor="#1f2937" backColor="#1f2937" :fixed="false" />
       <view class="page-header-actions">
-        <view class="download-btn" @click="downloadReport" :class="{ 'btn-loading': isDownloading }">
+        <view
+          class="download-btn"
+          @click="downloadReport"
+          :class="{ 'btn-loading': isDownloading }"
+        >
           <text class="download-icon">↓</text>
-          <text class="download-btn-text">{{ isDownloading ? tr("生成中...") : tr("下载报告") }}</text>
+          <text class="download-btn-text">{{
+            isDownloading ? tr("生成中...") : tr("下载报告")
+          }}</text>
         </view>
       </view>
       <view class="page-body">
         <view class="page-title">{{ tr("人生报告") }}</view>
         <view class="page-desc">{{
           tr(
-            "这是一份把长期节奏、年度重点和月度提醒整理成生活行动的报告。先看今年主旋律，再看未来指引，最后按月份慢慢参考。"
+            "这是一份把长期节奏、年度重点和月度提醒整理成生活行动的报告。先看今年主旋律，再看未来指引，最后按月份慢慢参考。",
           )
         }}</view>
         <view class="page-top-card">
-          <view class="top-card-item" v-for="(item, index) in topCardItems" :key="index">
+          <view
+            class="top-card-item"
+            v-for="(item, index) in topCardItems"
+            :key="index"
+          >
             <view class="top-card-label">{{ item.label }}</view>
             <view class="top-card-value">{{ item.value }}</view>
           </view>
@@ -709,7 +999,11 @@ onPageScroll((e) => {
 
         <!-- 快速导航 -->
         <view v-if="false" class="quick-nav">
-          <scroll-view class="quick-nav-scroll" scroll-x :show-scrollbar="false">
+          <scroll-view
+            class="quick-nav-scroll"
+            scroll-x
+            :show-scrollbar="false"
+          >
             <view class="quick-nav-inner">
               <view
                 class="quick-nav-item"
@@ -726,7 +1020,11 @@ onPageScroll((e) => {
         <view id="fast-read" class="fast-read">
           <view class="fast-read-title">{{ tr("快速阅读") }}</view>
           <view class="fast-read-grid">
-            <view class="fast-read-item" v-for="(item, index) in fastReadItems" :key="index">
+            <view
+              class="fast-read-item"
+              v-for="(item, index) in fastReadItems"
+              :key="index"
+            >
               <image class="fast-read-icon" :src="item.icon" mode="aspectFit" />
               <view class="fast-read-text">
                 <text class="fast-read-label">{{ item.label }}</text>
@@ -755,7 +1053,9 @@ onPageScroll((e) => {
 
           <!-- 标签行 -->
           <view class="decade-tags">
-            <view class="decade-tag" v-for="(tag, i) in decadeTags" :key="i">{{ tag }}</view>
+            <view class="decade-tag" v-for="(tag, i) in decadeTags" :key="i">{{
+              tag
+            }}</view>
           </view>
 
           <view class="decade-divider" />
@@ -783,8 +1083,16 @@ onPageScroll((e) => {
           <!-- 十二个生活主题 -->
           <view class="life-themes-title">{{ tr("十二个生活主题") }}</view>
           <view class="life-themes-grid">
-            <view class="life-theme-card" v-for="(item, i) in displayedLifeThemes" :key="i">
-              <image class="life-theme-icon" :src="item.icon" mode="aspectFit" />
+            <view
+              class="life-theme-card"
+              v-for="(item, i) in displayedLifeThemes"
+              :key="i"
+            >
+              <image
+                class="life-theme-icon"
+                :src="item.icon"
+                mode="aspectFit"
+              />
               <text class="life-theme-name">{{ item.title }}</text>
               <text class="life-theme-desc">{{ item.desc }}</text>
             </view>
@@ -794,7 +1102,11 @@ onPageScroll((e) => {
             <text class="life-themes-toggle-text">
               {{ lifeThemesExpanded ? tr("收起") : tr("展开全部12个主题") }}
             </text>
-            <text class="life-themes-toggle-arrow" :class="{ 'life-themes-toggle-arrow--up': lifeThemesExpanded }">▼</text>
+            <text
+              class="life-themes-toggle-arrow"
+              :class="{ 'life-themes-toggle-arrow--up': lifeThemesExpanded }"
+              >▼</text
+            >
           </view>
         </view>
 
@@ -808,7 +1120,7 @@ onPageScroll((e) => {
             </view>
             <image
               class="annual-rhythm-img"
-              :src="getStaticPath('images/life-report/annual-rhythm.png')"
+              :src="getStaticPath('life-report/annual-rhythm.png')"
               mode="aspectFit"
             />
           </view>
@@ -842,7 +1154,11 @@ onPageScroll((e) => {
 
           <!-- 月份 Tab 横向滚动 -->
           <view class="monthly-tabs-wrapper">
-            <scroll-view class="monthly-tabs-scroll" scroll-x :show-scrollbar="false">
+            <scroll-view
+              class="monthly-tabs-scroll"
+              scroll-x
+              :show-scrollbar="false"
+            >
               <view class="monthly-tabs">
                 <view
                   class="monthly-tab"
@@ -861,10 +1177,14 @@ onPageScroll((e) => {
           <!-- 月份内容卡片 -->
           <view class="monthly-content">
             <view class="monthly-content-left">
-              <text class="monthly-content-month">{{ selectedMonth }}{{ tr("月") }}</text>
+              <text class="monthly-content-month"
+                >{{ selectedMonth }}{{ tr("月") }}</text
+              >
             </view>
             <view class="monthly-content-right">
-              <text class="monthly-content-title">{{ monthContents.title }}</text>
+              <text class="monthly-content-title">{{
+                monthContents.title
+              }}</text>
               <text class="monthly-content-desc">{{ monthContents.desc }}</text>
             </view>
           </view>
@@ -872,7 +1192,10 @@ onPageScroll((e) => {
 
         <!-- 年度生活节奏指引 -->
         <view id="guide-card" class="guide-card">
-          <text class="guide-time">{{ tr("时间参考") }}：{{ targetYear }} · {{ annualStemBranch || tr("常年") }}</text>
+          <text class="guide-time"
+            >{{ tr("时间参考") }}：{{ targetYear }} ·
+            {{ annualStemBranch || tr("常年") }}</text
+          >
           <text class="guide-title">{{ annualRhythmTitle }}</text>
           <text class="guide-desc">{{ annualRhythmDesc }}</text>
         </view>
@@ -884,177 +1207,244 @@ onPageScroll((e) => {
         </view>
 
         <!-- 生活十问 & 空间建议 -->
-      <view class="extras-card">
-        <!-- 生活十问 -->
-        <text class="extras-section-title">{{ tr("生活十问") }}</text>
+        <view class="extras-card">
+          <!-- 生活十问 -->
+          <text class="extras-section-title">{{ tr("生活十问") }}</text>
 
-        <!-- 可用字段 -->
-        <view class="extras-fields">
-          <view class="extras-field-row" v-for="(f, i) in tenQuestionsFields" :key="i">
-            <image class="extras-field-icon" :src="f.icon" mode="aspectFit" />
-            <view class="extras-field-text">
-              <view class="extras-field-header">
-                <text class="extras-field-label">{{ f.label }}</text>
-                <text v-if="f.sub" class="extras-field-sub">{{ f.sub }}</text>
+          <!-- 可用字段 -->
+          <view class="extras-fields">
+            <view
+              class="extras-field-row"
+              v-for="(f, i) in tenQuestionsFields"
+              :key="i"
+            >
+              <image class="extras-field-icon" :src="f.icon" mode="aspectFit" />
+              <view class="extras-field-text">
+                <view class="extras-field-header">
+                  <text class="extras-field-label">{{ f.label }}</text>
+                  <text v-if="f.sub" class="extras-field-sub">{{ f.sub }}</text>
+                </view>
+                <text class="extras-field-desc">{{ f.desc }}</text>
               </view>
-              <text class="extras-field-desc">{{ f.desc }}</text>
+            </view>
+          </view>
+
+          <view class="extras-divider" />
+
+          <!-- 支持的不同时序 -->
+          <text class="extras-section-title">{{ tr("支持的不同时序") }}</text>
+          <view class="extras-time-levels">
+            <view
+              class="extras-time-row"
+              v-for="(t, i) in tenQuestionsTimeLevels"
+              :key="i"
+              :style="{ backgroundColor: t.bg }"
+            >
+              <view class="extras-time-text">
+                <text class="extras-time-label">{{ t.label }}</text>
+                <text class="extras-time-desc">{{ t.desc }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="extras-divider" />
+
+          <!-- 十个年度问题 -->
+          <text class="extras-section-title">{{ tr("十个年度问题") }}</text>
+          <view class="extras-questions">
+            <view
+              class="extras-question-card"
+              v-for="(q, i) in tenQuestionsSamples"
+              :key="i"
+            >
+              <view class="extras-question-header">
+                <text class="extras-question-name">{{
+                  q.display_question || q.question
+                }}</text>
+                <view class="extras-question-badge">
+                  <text class="extras-question-badge-text">{{
+                    q.palace || q.badge
+                  }}</text>
+                </view>
+              </view>
+              <!-- 方位 -->
+              <view
+                v-if="q.direction"
+                class="extras-qtag"
+                style="margin-bottom: 8rpx"
+              >
+                <text class="extras-qtag-label">{{ tr("方位") }}</text>
+                <text class="extras-qtag-value">{{ q.direction }}</text>
+              </view>
+              <!-- 建议（AI 生成的详细文本） -->
+              <text
+                class="extras-question-advice"
+                style="margin-bottom: 12rpx"
+                >{{ q.advice }}</text
+              >
+              <view class="extras-question-tags">
+                <view class="extras-qtag" v-if="q.colors">
+                  <text class="extras-qtag-label">{{ tr("幸运颜色") }}</text>
+                  <text class="extras-qtag-value">{{ q.colors }}</text>
+                </view>
+                <view class="extras-qtag" v-if="q.primary_surnames">
+                  <text class="extras-qtag-label">{{ tr("首选贵人姓") }}</text>
+                  <text class="extras-qtag-value">{{
+                    q.primary_surnames
+                  }}</text>
+                </view>
+                <view class="extras-qtag" v-if="q.secondary_surnames">
+                  <text class="extras-qtag-label">{{ tr("次选贵人姓") }}</text>
+                  <text class="extras-qtag-value">{{
+                    q.secondary_surnames
+                  }}</text>
+                </view>
+                <view class="extras-qtag" v-if="q.strategy">
+                  <text class="extras-qtag-label">{{ tr("策略") }}</text>
+                  <text class="extras-qtag-value">{{ q.strategy }}</text>
+                </view>
+                <view class="extras-qtag" v-if="q.main_element">
+                  <text class="extras-qtag-label">{{ tr("五行") }}</text>
+                  <text class="extras-qtag-value">{{ q.main_element }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <view class="extras-divider" />
+
+          <!-- 空间五建议 -->
+          <text class="extras-section-title">{{
+            tr("旁边功能：空间五建议")
+          }}</text>
+          <view class="extras-fields">
+            <view
+              class="extras-field-row"
+              v-for="(f, i) in fengshuiFields"
+              :key="i"
+            >
+              <image class="extras-field-icon" :src="f.icon" mode="aspectFit" />
+              <view class="extras-field-text">
+                <view class="extras-field-header">
+                  <text class="extras-field-label">{{ f.label }}</text>
+                  <text v-if="f.sub" class="extras-field-sub">{{ f.sub }}</text>
+                </view>
+                <text class="extras-field-desc">{{ f.desc }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="extras-divider" />
+
+          <!-- 空间五建议完整样例 -->
+          <view class="extras-fengshui-samples">
+            <view
+              class="fengshui-corner-card"
+              :class="
+                'fengshui-corner-card--' + (corner.elementClass || 'default')
+              "
+              v-for="(corner, i) in fengshuiSamples.length > 0
+                ? fengshuiSamples
+                : fengshuiCorners"
+              :key="i"
+            >
+              <!-- 六格建议网格 -->
+              <view class="fengshui-corner-grid">
+                <view class="fengshui-grid-item">
+                  <text class="fengshui-grid-label">{{ tr("颜色") }}</text>
+                  <text class="fengshui-grid-value">{{
+                    corner.color || corner.favorable_color || ""
+                  }}</text>
+                </view>
+                <view class="fengshui-grid-item">
+                  <text class="fengshui-grid-label">{{ tr("协作线索") }}</text>
+                  <text class="fengshui-grid-value">{{
+                    corner.clue || ""
+                  }}</text>
+                </view>
+                <view class="fengshui-grid-item">
+                  <text class="fengshui-grid-label">{{ tr("生活主题") }}</text>
+                  <text class="fengshui-grid-value">{{
+                    corner.theme || corner.palace || ""
+                  }}</text>
+                </view>
+                <view class="fengshui-grid-item">
+                  <text class="fengshui-grid-label">{{ tr("空间小物") }}</text>
+                  <text class="fengshui-grid-value">{{
+                    corner.items || corner.suggested_items || ""
+                  }}</text>
+                </view>
+                <view class="fengshui-grid-item">
+                  <text class="fengshui-grid-label">{{ tr("象征图案") }}</text>
+                  <text class="fengshui-grid-value">{{
+                    corner.symbol || corner.suggested_symbol || ""
+                  }}</text>
+                </view>
+                <view class="fengshui-grid-item">
+                  <text class="fengshui-grid-label">{{ tr("策略") }}</text>
+                  <text class="fengshui-grid-value">{{
+                    corner.strategy || ""
+                  }}</text>
+                </view>
+              </view>
             </view>
           </view>
         </view>
 
-        <view class="extras-divider" />
+        <!-- 年度轻调适 -->
+        <view id="adjust-card" class="adjust-card">
+          <text class="adjust-title">{{ tr("年度轻调适") }}</text>
+          <text class="adjust-desc">{{
+            tr(
+              "这一栏把年度节奏转成可执行的小动作：先整理空间，再整理关系，最后整理行动顺序。所有内容只作轻量生活提醒，不承诺任何现实结果。",
+            )
+          }}</text>
 
-        <!-- 支持的不同时序 -->
-        <text class="extras-section-title">{{ tr("支持的不同时序") }}</text>
-        <view class="extras-time-levels">
-          <view class="extras-time-row" v-for="(t, i) in tenQuestionsTimeLevels" :key="i" :style="{ backgroundColor: t.bg }">
-            <view class="extras-time-text">
-              <text class="extras-time-label">{{ t.label }}</text>
-              <text class="extras-time-desc">{{ t.desc }}</text>
-            </view>
-          </view>
-        </view>
-
-        <view class="extras-divider" />
-
-        <!-- 十个年度问题 -->
-        <text class="extras-section-title">{{ tr("十个年度问题") }}</text>
-        <view class="extras-questions">
-          <view class="extras-question-card" v-for="(q, i) in tenQuestionsSamples" :key="i">
-            <view class="extras-question-header">
-              <text class="extras-question-name">{{ q.display_question || q.question }}</text>
-              <view class="extras-question-badge">
-                <text class="extras-question-badge-text">{{ q.palace || q.badge }}</text>
-              </view>
-            </view>
-            <!-- 方位 -->
-            <view v-if="q.direction" class="extras-qtag" style="margin-bottom: 8rpx;">
-              <text class="extras-qtag-label">{{ tr("方位") }}</text>
-              <text class="extras-qtag-value">{{ q.direction }}</text>
-            </view>
-            <!-- 建议（AI 生成的详细文本） -->
-            <text class="extras-question-advice" style="margin-bottom: 12rpx;">{{ q.advice }}</text>
-            <view class="extras-question-tags">
-              <view class="extras-qtag" v-if="q.colors">
-                <text class="extras-qtag-label">{{ tr("幸运颜色") }}</text>
-                <text class="extras-qtag-value">{{ q.colors }}</text>
-              </view>
-              <view class="extras-qtag" v-if="q.primary_surnames">
-                <text class="extras-qtag-label">{{ tr("首选贵人姓") }}</text>
-                <text class="extras-qtag-value">{{ q.primary_surnames }}</text>
-              </view>
-              <view class="extras-qtag" v-if="q.secondary_surnames">
-                <text class="extras-qtag-label">{{ tr("次选贵人姓") }}</text>
-                <text class="extras-qtag-value">{{ q.secondary_surnames }}</text>
-              </view>
-              <view class="extras-qtag" v-if="q.strategy">
-                <text class="extras-qtag-label">{{ tr("策略") }}</text>
-                <text class="extras-qtag-value">{{ q.strategy }}</text>
-              </view>
-              <view class="extras-qtag" v-if="q.main_element">
-                <text class="extras-qtag-label">{{ tr("五行") }}</text>
-                <text class="extras-qtag-value">{{ q.main_element }}</text>
-              </view>
-            </view>
-          </view>
-        </view>
-
-        <view class="extras-divider" />
-
-        <!-- 空间五建议 -->
-        <text class="extras-section-title">{{ tr("旁边功能：空间五建议") }}</text>
-        <view class="extras-fields">
-          <view class="extras-field-row" v-for="(f, i) in fengshuiFields" :key="i">
-            <image class="extras-field-icon" :src="f.icon" mode="aspectFit" />
-            <view class="extras-field-text">
-              <view class="extras-field-header">
-                <text class="extras-field-label">{{ f.label }}</text>
-                <text v-if="f.sub" class="extras-field-sub">{{ f.sub }}</text>
-              </view>
-              <text class="extras-field-desc">{{ f.desc }}</text>
-            </view>
-          </view>
-        </view>
-
-        <view class="extras-divider" />
-
-        <!-- 空间五建议完整样例 -->
-        <view class="extras-fengshui-samples">
+          <!-- 信息行 -->
           <view
-            class="fengshui-corner-card"
-            :class="'fengshui-corner-card--' + (corner.elementClass || 'default')"
-            v-for="(corner, i) in fengshuiSamples.length > 0 ? fengshuiSamples : fengshuiCorners"
+            class="adjust-row"
+            v-for="(item, i) in lightAdjustItems"
             :key="i"
           >
-            <!-- 六格建议网格 -->
-            <view class="fengshui-corner-grid">
-              <view class="fengshui-grid-item">
-                <text class="fengshui-grid-label">{{ tr("颜色") }}</text>
-                <text class="fengshui-grid-value">{{ corner.color || corner.favorable_color || "" }}</text>
+            <view class="adjust-row-text">
+              <text class="adjust-row-label">{{ item.label }}</text>
+              <text class="adjust-row-value">{{ item.value }}</text>
+            </view>
+            <image class="adjust-row-icon" :src="item.icon" mode="aspectFit" />
+          </view>
+
+          <!-- 年度节奏详情卡片 -->
+          <view class="adjust-detail">
+            <view class="adjust-detail-main">
+              <view class="adjust-detail-text">
+                <text class="adjust-detail-label">{{
+                  rhythmDetail.label
+                }}</text>
+                <text class="adjust-detail-title">{{
+                  rhythmDetail.title
+                }}</text>
+                <text class="adjust-detail-desc">{{ rhythmDetail.desc }}</text>
               </view>
-              <view class="fengshui-grid-item">
-                <text class="fengshui-grid-label">{{ tr("协作线索") }}</text>
-                <text class="fengshui-grid-value">{{ corner.clue || "" }}</text>
-              </view>
-              <view class="fengshui-grid-item">
-                <text class="fengshui-grid-label">{{ tr("生活主题") }}</text>
-                <text class="fengshui-grid-value">{{ corner.theme || corner.palace || "" }}</text>
-              </view>
-              <view class="fengshui-grid-item">
-                <text class="fengshui-grid-label">{{ tr("空间小物") }}</text>
-                <text class="fengshui-grid-value">{{ corner.items || corner.suggested_items || "" }}</text>
-              </view>
-              <view class="fengshui-grid-item">
-                <text class="fengshui-grid-label">{{ tr("象征图案") }}</text>
-                <text class="fengshui-grid-value">{{ corner.symbol || corner.suggested_symbol || "" }}</text>
-              </view>
-              <view class="fengshui-grid-item">
-                <text class="fengshui-grid-label">{{ tr("策略") }}</text>
-                <text class="fengshui-grid-value">{{ corner.strategy || "" }}</text>
+              <image
+                class="adjust-detail-icon"
+                :src="rhythmDetail.icon"
+                mode="aspectFit"
+              />
+            </view>
+            <view class="adjust-detail-tags">
+              <view
+                class="adjust-tag"
+                v-for="(tag, j) in rhythmDetail.tags"
+                :key="j"
+              >
+                <text class="adjust-tag-label">{{ tag.label }}</text>
+                <text class="adjust-tag-value">{{ tag.value }}</text>
               </view>
             </view>
           </view>
         </view>
-      </view>
 
-      <!-- 年度轻调适 -->
-      <view id="adjust-card" class="adjust-card">
-        <text class="adjust-title">{{ tr("年度轻调适") }}</text>
-        <text class="adjust-desc">{{
-          tr(
-            "这一栏把年度节奏转成可执行的小动作：先整理空间，再整理关系，最后整理行动顺序。所有内容只作轻量生活提醒，不承诺任何现实结果。"
-          )
-        }}</text>
-
-        <!-- 信息行 -->
-        <view class="adjust-row" v-for="(item, i) in lightAdjustItems" :key="i">
-          <view class="adjust-row-text">
-            <text class="adjust-row-label">{{ item.label }}</text>
-            <text class="adjust-row-value">{{ item.value }}</text>
-          </view>
-          <image class="adjust-row-icon" :src="item.icon" mode="aspectFit" />
-        </view>
-
-        <!-- 年度节奏详情卡片 -->
-        <view class="adjust-detail">
-          <view class="adjust-detail-main">
-            <view class="adjust-detail-text">
-              <text class="adjust-detail-label">{{ rhythmDetail.label }}</text>
-              <text class="adjust-detail-title">{{ rhythmDetail.title }}</text>
-              <text class="adjust-detail-desc">{{ rhythmDetail.desc }}</text>
-            </view>
-            <image class="adjust-detail-icon" :src="rhythmDetail.icon" mode="aspectFit" />
-          </view>
-          <view class="adjust-detail-tags">
-            <view class="adjust-tag" v-for="(tag, j) in rhythmDetail.tags" :key="j">
-              <text class="adjust-tag-label">{{ tag.label }}</text>
-              <text class="adjust-tag-value">{{ tag.value }}</text>
-            </view>
-          </view>
-        </view>
-      </view>
-
-      <!-- 免责声明 -->
+        <!-- 免责声明 -->
         <view class="disclaimer">
           <text>{{ disclaimerText }}</text>
         </view>
@@ -1198,38 +1588,43 @@ onPageScroll((e) => {
     border: 1rpx solid #e5e7eb;
     border-radius: 40rpx;
     box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
-    
+
     .download-icon {
       font-size: 24rpx;
       color: #374151;
       margin-right: 8rpx;
       transition: transform 0.2s;
     }
-    
+
     .download-btn-text {
       font-size: 24rpx;
       color: #374151;
       font-weight: 500;
     }
-    
+
     &.btn-loading {
       opacity: 0.7;
       pointer-events: none;
-      
+
       .download-icon {
         animation: bounce 1s infinite;
       }
     }
-    
+
     &:active {
       transform: scale(0.96);
       background: rgba(255, 255, 255, 0.85);
     }
   }
-  
+
   @keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4rpx); }
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4rpx);
+    }
   }
 
   .page-body {
@@ -1238,7 +1633,8 @@ onPageScroll((e) => {
     z-index: 2;
 
     // 全局文字换行兜底：防止任何长文本溢出
-    view, text {
+    view,
+    text {
       word-break: break-all;
       overflow-wrap: break-word;
     }
@@ -2431,11 +2827,21 @@ onPageScroll((e) => {
       justify-content: center;
       flex-shrink: 0;
 
-      &--metal { background: #d4a73a; }
-      &--wood { background: #7da56b; }
-      &--fire { background: #e06a4a; }
-      &--water { background: #5f95d3; }
-      &--earth { background: #c7a16a; }
+      &--metal {
+        background: #d4a73a;
+      }
+      &--wood {
+        background: #7da56b;
+      }
+      &--fire {
+        background: #e06a4a;
+      }
+      &--water {
+        background: #5f95d3;
+      }
+      &--earth {
+        background: #c7a16a;
+      }
     }
 
     .fengshui-corner-icon-text {
@@ -2465,11 +2871,26 @@ onPageScroll((e) => {
       border-radius: 999rpx;
       align-self: flex-start;
 
-      &--metal { background: #f9e9bf; color: #a87a13; }
-      &--wood { background: #e4f2dd; color: #5a814b; }
-      &--fire { background: #ffe0d8; color: #c95634; }
-      &--water { background: #e3f0ff; color: #4a79b5; }
-      &--earth { background: #f4e7d1; color: #a9824f; }
+      &--metal {
+        background: #f9e9bf;
+        color: #a87a13;
+      }
+      &--wood {
+        background: #e4f2dd;
+        color: #5a814b;
+      }
+      &--fire {
+        background: #ffe0d8;
+        color: #c95634;
+      }
+      &--water {
+        background: #e3f0ff;
+        color: #4a79b5;
+      }
+      &--earth {
+        background: #f4e7d1;
+        color: #a9824f;
+      }
     }
 
     .fengshui-corner-badge-text {

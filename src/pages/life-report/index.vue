@@ -2,14 +2,20 @@
   <view class="life-report-page">
     <!-- 顶部装饰背景 -->
     <view class="top-bg-wrap">
-      <image class="top-bg" src="/static/life-report/result-top.png" mode="aspectFill" />
+      <image
+        class="top-bg"
+        src="/static/life-report/result-top.png"
+        mode="aspectFill"
+      />
     </view>
 
     <view class="page-body">
       <!-- 标题区 -->
       <view class="hero">
         <text class="hero-title">人生报告</text>
-        <text class="hero-desc">多维度解读你的人生轨迹，探索属于你的生命节奏</text>
+        <text class="hero-desc"
+          >多维度解读你的人生轨迹，探索属于你的生命节奏</text
+        >
       </view>
 
       <!-- 报告预览卡片 -->
@@ -17,34 +23,56 @@
         <text class="preview-title">报告包含</text>
         <view class="preview-grid">
           <view class="preview-item">
-            <image class="preview-icon" src="/static/feature/icon-date.png" mode="aspectFit" />
+            <image
+              class="preview-icon"
+              src="/static/life-report/date-icon.png"
+              mode="aspectFit"
+            />
             <view class="preview-text">
               <text class="preview-label">年度报告</text>
               <text class="preview-value">全年节奏与核心主题</text>
             </view>
           </view>
           <view class="preview-item">
-            <image class="preview-icon" src="/static/feature/icon-book.png" mode="aspectFit" />
+            <image
+              class="preview-icon"
+              src="/static/life-report/book-icon.png"
+              mode="aspectFit"
+            />
             <view class="preview-text">
               <text class="preview-label">十年行旅</text>
               <text class="preview-value">长期阶段与生活主题</text>
             </view>
           </view>
           <view class="preview-item">
-            <image class="preview-icon" src="/static/feature/icon-bell.png" mode="aspectFit" />
+            <image
+              class="preview-icon"
+              src="/static/life-report/ring-icon.png"
+              mode="aspectFit"
+            />
             <view class="preview-text">
               <text class="preview-label">每月提醒</text>
               <text class="preview-value">12个月度旋律参考</text>
             </view>
           </view>
           <view class="preview-item">
-            <image class="preview-icon" src="/static/feature/icon-location.png" mode="aspectFit" />
+            <image
+              class="preview-icon"
+              src="/static/life-report/position-icon.png"
+              mode="aspectFit"
+            />
             <view class="preview-text">
               <text class="preview-label">空间建议</text>
               <text class="preview-value">生活空间的轻量调适</text>
             </view>
           </view>
         </view>
+      </view>
+
+      <!-- 查询已有报告入口 -->
+      <view class="query-entry" @click="goQueryOrder">
+        <text class="query-entry-text">查询已有报告</text>
+        <text class="query-entry-arrow">›</text>
       </view>
 
       <!-- 表单卡片 -->
@@ -70,8 +98,11 @@
             <text class="label">出生日期</text>
             <picker mode="date" :value="form.solar_date" @change="onDateChange">
               <view class="picker-input">
-                <text class="picker-text" :class="{ 'picker-text-placeholder': !form.solar_date }">
-                  {{ form.solar_date || '请选择公历生日' }}
+                <text
+                  class="picker-text"
+                  :class="{ 'picker-text-placeholder': !form.solar_date }"
+                >
+                  {{ form.solar_date || "请选择公历生日" }}
                 </text>
                 <text class="picker-arrow">›</text>
               </view>
@@ -82,8 +113,11 @@
             <text class="label">出生时间</text>
             <picker mode="time" :value="form.birth_time" @change="onTimeChange">
               <view class="picker-input">
-                <text class="picker-text" :class="{ 'picker-text-placeholder': !form.birth_time }">
-                  {{ form.birth_time || '请选择出生时间' }}
+                <text
+                  class="picker-text"
+                  :class="{ 'picker-text-placeholder': !form.birth_time }"
+                >
+                  {{ form.birth_time || "请选择出生时间" }}
                 </text>
                 <text class="picker-arrow">›</text>
               </view>
@@ -100,8 +134,11 @@
               @columnchange="onRegionColumnChange"
             >
               <view class="picker-input">
-                <text class="picker-text" :class="{ 'picker-text-placeholder': !form.birth_place }">
-                  {{ form.birth_place || '请选择出生地' }}
+                <text
+                  class="picker-text"
+                  :class="{ 'picker-text-placeholder': !form.birth_place }"
+                >
+                  {{ form.birth_place || "请选择出生地" }}
                 </text>
                 <text class="picker-arrow">›</text>
               </view>
@@ -130,7 +167,11 @@
         </view>
 
         <!-- 提交按钮 -->
-        <view class="submit-btn" :class="{ 'submit-btn-disabled': loading }" @click="onSubmit">
+        <view
+          class="submit-btn"
+          :class="{ 'submit-btn-disabled': loading }"
+          @click="onSubmit"
+        >
           <template v-if="priceLoading">
             <view class="submit-spinner"></view>
             <text class="submit-btn-text">加载中</text>
@@ -140,12 +181,6 @@
             <text class="submit-price">{{ price }}</text>
             <text class="submit-btn-text">立即解锁</text>
           </template>
-        </view>
-
-        <!-- 历史记录入口 -->
-        <view class="history-entry">
-          <text class="history-entry-text">查看历史记录</text>
-          <text class="history-entry-arrow">›</text>
         </view>
       </view>
     </view>
@@ -173,12 +208,16 @@
               mode="aspectFit"
             />
             <view v-else class="captcha-img-placeholder">点击刷新</view>
-            <view v-if="captchaLoading" class="captcha-img-loading">加载中</view>
+            <view v-if="captchaLoading" class="captcha-img-loading"
+              >加载中</view
+            >
           </view>
         </view>
 
         <view class="captcha-actions">
-          <view class="captcha-btn captcha-btn-cancel" @click="closeCaptcha">取消</view>
+          <view class="captcha-btn captcha-btn-cancel" @click="closeCaptcha"
+            >取消</view
+          >
           <view
             class="captcha-btn captcha-btn-confirm"
             :class="{ 'captcha-btn-disabled': loading || !captchaCode }"
@@ -199,7 +238,7 @@ import { onShow } from "@dcloudio/uni-app";
 import {
   getPayOrderPrice,
   createPayOrder,
-  getPayStatus
+  getPayStatus,
 } from "@/api/module/pay.js";
 import { generateReport, getRegions } from "@/api/module/lifeReport.js";
 import { getCaptchaImage } from "@/api/module/captcha.js";
@@ -212,7 +251,7 @@ const form = reactive({
   solar_date: "",
   birth_time: "",
   gender: "",
-  birth_place: ""
+  birth_place: "",
 });
 
 const loading = ref(false);
@@ -227,10 +266,14 @@ const captchaCode = ref("");
 const captchaLoading = ref(false);
 
 // 地区选择器
-const regionList = ref([]);       // 原始数据 [{country, province[]}]
+const regionList = ref([]); // 原始数据 [{country, province[]}]
 const pickerRange = ref([[], []]); // 两列：国家列表、当前国家的省份列表
-const pickerValue = ref([0, 0]);   // 当前选中索引 [countryIdx, provinceIdx]
-const selectedProvince = ref("");  // 最终选中的省份名称（作为 city 传入）
+const pickerValue = ref([0, 0]); // 当前选中索引 [countryIdx, provinceIdx]
+const selectedProvince = ref(""); // 最终选中的省份名称（作为 city 传入）
+
+const goQueryOrder = () => {
+  uni.navigateTo({ url: "/pages/life-report/query" });
+};
 
 // 支付订单
 let currentOrderNo = "";
@@ -269,12 +312,12 @@ const fetchRegions = async () => {
       const entries = Object.entries(res.data);
       regionList.value = entries.map(([country, info]) => ({
         country,
-        provinces: Object.keys(info.locations || {})
+        provinces: Object.keys(info.locations || {}),
       }));
       if (regionList.value.length > 0) {
         pickerRange.value = [
           regionList.value.map((item) => item.country),
-          regionList.value[0].provinces
+          regionList.value[0].provinces,
         ];
       }
     }
@@ -352,7 +395,7 @@ const openExternalUrl = (url) => {
           } else {
             resolve(false);
           }
-        }
+        },
       });
     } else {
       resolve(true);
@@ -366,7 +409,7 @@ const openExternalUrl = (url) => {
         uni.showToast({ title: "请在浏览器粘贴打开", icon: "none" });
         resolve(false);
       },
-      fail: () => resolve(false)
+      fail: () => resolve(false),
     });
     // #endif
   });
@@ -389,12 +432,12 @@ const triggerAlipayForm = (html) => {
 
   // #ifdef H5
   // ---------- 策略 1：新窗口写入 HTML ----------
-//   const w = window.open("", "_blank", "noopener");
-//   if (w) {
-//     w.document.write(html);
-//     w.document.close();
-//     return w; // 返回窗口引用，用于支付成功后关闭
-//   }
+  //   const w = window.open("", "_blank", "noopener");
+  //   if (w) {
+  //     w.document.write(html);
+  //     w.document.close();
+  //     return w; // 返回窗口引用，用于支付成功后关闭
+  //   }
 
   // ---------- 策略 2：弹窗被拦截，在主页 document 中构造 form POST ----------
   const parser = new DOMParser();
@@ -488,9 +531,12 @@ const onConfirmPay = async () => {
       solar_date: form.solar_date,
       birth_time: form.birth_time,
       gender: form.gender,
-      birth_place: form.birth_place
+      birth_place: form.birth_place,
     });
-    const returnUrl = window.location.href.replace(/\/index$/, "/result") + "?" + params.toString();
+    const returnUrl =
+      window.location.href.replace(/\/index$/, "/result") +
+      "?" +
+      params.toString();
     // #endif
     // 检测是否为手机端，决定使用 H5 还是 PC 支付
     // #ifdef H5
@@ -507,7 +553,7 @@ const onConfirmPay = async () => {
       code: captchaCode.value,
       uuid: captchaUuid.value,
       // #ifdef H5
-      returnUrl
+      returnUrl,
       // #endif
     });
     if (createRes?.code !== 200) {
@@ -523,9 +569,10 @@ const onConfirmPay = async () => {
     if (currentOrderNo) {
       try {
         localStorage.setItem("report_order_no", currentOrderNo);
-      } catch (_) { /* ignore */ }
+      } catch (_) {
+        /* ignore */
+      }
     }
-    
 
     if (!currentOrderNo) {
       uni.showToast({ title: "未获取到订单号", icon: "none" });
@@ -545,7 +592,7 @@ const onConfirmPay = async () => {
         uni.showToast({
           title: "请在新窗口完成支付",
           icon: "none",
-          duration: 2000
+          duration: 2000,
         });
         // 启动轮询（用户支付完成会从轮询里捕获到已支付）
         startPayPolling();
@@ -585,7 +632,12 @@ const startPayPolling = () => {
         onPaySuccess();
         return;
       }
-      if (status === "2" || status === "3" || status === "CLOSED" || status === "REFUNDED") {
+      if (
+        status === "2" ||
+        status === "3" ||
+        status === "CLOSED" ||
+        status === "REFUNDED"
+      ) {
         uni.hideLoading();
         clearPayPolling();
         uni.showToast({ title: "订单已关闭", icon: "none" });
@@ -618,7 +670,11 @@ const clearPayPolling = () => {
 const onPaySuccess = async () => {
   // 关掉支付窗口
   if (payWindow && !payWindow.closed) {
-    try { payWindow.close(); } catch (_) { /* ignore */ }
+    try {
+      payWindow.close();
+    } catch (_) {
+      /* ignore */
+    }
   }
   payWindow = null;
 
@@ -630,7 +686,7 @@ const onPaySuccess = async () => {
       solarDate: form.solar_date,
       birthTime: form.birth_time,
       gender: form.gender,
-      city
+      city,
     });
     uni.hideLoading();
     if (genRes?.code !== 200) {
@@ -644,7 +700,7 @@ const onPaySuccess = async () => {
       birth_time: encodeURIComponent(form.birth_time),
       gender: encodeURIComponent(form.gender),
       birth_place: encodeURIComponent(form.birth_place),
-      order_no: encodeURIComponent(currentOrderNo)
+      order_no: encodeURIComponent(currentOrderNo),
     };
     const qs = Object.keys(params)
       .map((k) => `${k}=${params[k]}`)
@@ -693,7 +749,7 @@ onUnmounted(() => {
 }
 
 .page-body {
-  margin-top: 60rpx;
+  margin-top: 40rpx;
   padding: 0 32rpx 40rpx;
   display: flex;
   flex-direction: column;
@@ -791,6 +847,26 @@ onUnmounted(() => {
   color: #000000;
   font-weight: 600;
   line-height: 36rpx;
+}
+
+/* ===== 查询入口 ===== */
+.query-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  padding: 24rpx 0 0;
+}
+
+.query-entry-text {
+  font-size: 26rpx;
+  color: #b37a0a;
+  font-weight: 500;
+}
+
+.query-entry-arrow {
+  font-size: 28rpx;
+  color: #b37a0a;
 }
 
 /* ===== 表单卡 ===== */
@@ -916,7 +992,13 @@ onUnmounted(() => {
   height: 96rpx;
   border-radius: 999rpx;
   margin: 40rpx 0 0;
-  background: linear-gradient(135deg, #d4a853 0%, #c4963f 30%, #b37a0a 70%, #9a6b08 100%);
+  background: linear-gradient(
+    135deg,
+    #d4a853 0%,
+    #c4963f 30%,
+    #b37a0a 70%,
+    #9a6b08 100%
+  );
   box-shadow: 0 8rpx 24rpx rgba(179, 122, 10, 0.3);
   display: flex;
   align-items: center;
@@ -952,26 +1034,6 @@ onUnmounted(() => {
   font-weight: 700;
   color: #ffffff;
   letter-spacing: 4rpx;
-}
-
-/* ===== 历史记录 ===== */
-.history-entry {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4rpx;
-  padding: 24rpx 0 0;
-}
-
-.history-entry-text {
-  font-size: 26rpx;
-  color: #b37a0a;
-  font-weight: 500;
-}
-
-.history-entry-arrow {
-  font-size: 28rpx;
-  color: #b37a0a;
 }
 
 /* ===== 提交按钮 loading ===== */

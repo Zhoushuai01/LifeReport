@@ -2,7 +2,7 @@
  * 泛娱乐开放报告 — 报告生成
  * /open/biz/report/generate  POST  生成报告
  */
-import { post } from "../request.js";
+import { get, post } from "../request.js";
 
 /**
  * 获取地区列表（国家+省份）
@@ -24,4 +24,14 @@ export function getRegions() {
  */
 export function generateReport(data) {
   return post("/open/biz/report/generate", data);
+}
+
+/**
+ * 查询报告数据
+ * GET /open/biz/report/data
+ * @param {Object} params
+ * @param {string} params.orderNo  系统订单号
+ */
+export function getReportData(params) {
+  return get("/open/biz/report/data", params);
 }

@@ -39,6 +39,7 @@
     "build:quickapp-webview-union": "uni build -p quickapp-webview-union"
   },
   "dependencies": {
+    "@babel/runtime": "^7.29.7",
     "@dcloudio/uni-app": "3.0.0-5000720260410001",
     "@dcloudio/uni-app-harmony": "3.0.0-5000720260410001",
     "@dcloudio/uni-app-plus": "3.0.0-5000720260410001",
@@ -55,6 +56,9 @@
     "@dcloudio/uni-mp-weixin": "3.0.0-5000720260410001",
     "@dcloudio/uni-mp-xhs": "3.0.0-5000720260410001",
     "@dcloudio/uni-quickapp-webview": "3.0.0-5000720260410001",
+    "dompurify": "^3.4.8",
+    "fast-png": "^8.0.0",
+    "fflate": "^0.8.3",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "vue": "^3.4.21",
